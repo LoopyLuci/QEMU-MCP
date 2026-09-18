@@ -1,0 +1,42 @@
+[project]
+name = "vm-mcp"
+version = "0.1.0"
+description = "MCP server for controlling QEMU/Omarchy virtual machines"
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name = "Omarchy VM Control", email = "dev@omarchy.local"},
+]
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "asyncssh>=2.14.0",
+    "loguru>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+vm-mcp = "vm_mcp.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vm_mcp = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
