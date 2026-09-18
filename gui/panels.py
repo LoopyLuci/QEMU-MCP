@@ -31,6 +31,15 @@ class DashboardPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._qmp_bridge = None
+        self._vm_state = "unknown"
+        self._vm_running = False
+        self._vm_pid = "—"
+        self._vm_ram = "—"
+        self._vm_cpus = "—"
+        self._vm_disk_used = "—"
+        self._vm_disk_total = "—"
+        self._vm_uptime = "0:00:00"
         self.setStyleSheet("background: #0f172a;")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -220,3 +229,48 @@ class DashboardPanel(QWidget):
         self.activity_list.insertItem(0, item)
         if self.activity_list.count() > 20:
             self.activity_list.takeItem(self.activity_list.count() - 1)
+
+    def set_qmp_bridge(self, bridge):
+        """Connect to QMP bridge for live status updates."""
+        self._qmp_bridge = bridge
+        bridge.vm_status.connect(self.update_vm_status)
+
+    def update_vm_status(self, status: dict):
+        """Update the dashboard display with VM status from QMP."""
+        state = status.get("state", "unknown")
+        self._vm_state = state
+        self._vm_running = state in ("running", "prelaunch", "inmigrate")
+
+        # Update status dot
+        if self._vm_running:
+            self.status_dot.set_status(running=True, connected=True)
+            state_label = self.findChild(QLabel, None)
+            for child in self.findChildren(QLabel):
+                if child.styleSheet().startswith("color: #94a3b8") and "font-size: 14px" in child.styleSheet():
+                    child.setText(state.title())
+                    child.setStyleSheet("color: #22c55e; font-size: 14px; font-weight: 600;")
+                    break
+        else:
+            self.status_dot.set_status(running=False, connected=False)
+
+        # Try to extract PID from status
+        pid = status.get("pid", status.get("pid", "—"))
+        if isinstance(pid, int):
+            self._vm_pid = str(pid)
+
+        # Update stats
+        self._update_stats_display()
+
+        # Query more data if running
+        if self._vm_running and self._qmp_bridge:
+            self._qmp_bridge.get_status()  # Refresh
+
+    def _update_stats_display(self):
+        """Refresh the stat labels in the dashboard."""
+        stats = self.findChildren(QLabel)
+        # Find and update stat value labels by matching text
+        for lbl in stats:
+            txt = lbl.text()
+            if txt == "—" and self._vm_pid != "—":
+                lbl.setText(self._vm_pid)
+                lbl.setStyleSheet("color: #64748b; font-size: 13px; font-weight: 600;")

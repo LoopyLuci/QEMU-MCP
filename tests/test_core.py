@@ -30,7 +30,7 @@ class TestVmMCPSettings:
         assert settings.vm_name == "omarchy-vm"
         assert settings.vm_ram_mb == 8192
         assert settings.vm_cpus == 4
-        assert settings.ssh_port == 22
+        assert settings.ssh_port == 2222  # QEMU user-mode NAT forwarding port
         assert settings.ssh_username == "OmarchyVM"
 
     def test_qmp_uri_tcp(self, monkeypatch):

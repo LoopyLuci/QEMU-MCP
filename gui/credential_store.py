@@ -75,13 +75,20 @@ class CredentialStore:
         if not self._master_password:
             # No master password — use a per-installation random key stored on disk
             key_file = self._store_path.parent / ".master_key"
+            try:
+                key_file.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
             if key_file.exists():
                 self._fernet = Fernet(key_file.read_bytes())
             else:
                 # Generate a new random key
                 key = Fernet.generate_key()
-                key_file.write_bytes(key)
-                key_file.chmod(0o600)
+                try:
+                    key_file.write_bytes(key)
+                    key_file.chmod(0o600)
+                except OSError:
+                    pass  # Best-effort; will still use in-memory key
                 self._fernet = Fernet(key)
             return
 

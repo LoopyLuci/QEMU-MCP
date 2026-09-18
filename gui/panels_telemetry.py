@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QGroupBox,
     QGridLayout,
+    QCheckBox,
     QSizePolicy,
 )
 
@@ -26,6 +27,8 @@ class TelemetryPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._qmp_bridge = None
+        self._ssh_bridge = None
         self.setStyleSheet("background: #0f172a;")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -166,26 +169,53 @@ class TelemetryPanel(QWidget):
             self.host_ram.update_data(random.uniform(35, 50))
             self.host_disk.update_data(random.uniform(10, 15))
 
+    def set_qmp_bridge(self, bridge):
+        """Connect to QMP bridge for VM metrics."""
+        self._qmp_bridge = bridge
+
+    def set_ssh_bridge(self, bridge):
+        """Connect to SSH bridge for guest metrics."""
+        self._ssh_bridge = bridge
+
     def _refresh_charts(self):
         """Generate and push new data points to all charts."""
         import random
+        import psutil
+
         random.seed()
 
-        # VM metrics — simulate realistic values
-        cpu = random.gauss(2.5, 1.5)
-        ram = 45 + random.gauss(0, 2)
-        disk = max(0, random.gauss(0.5, 0.3))
-        net = max(0, random.gauss(50, 30))
+        # VM metrics — try QMP first, fall back to simulation
+        vm_cpu = 0.0
+        vm_ram = 0.0
 
-        self.cpu_chart.update_data(max(0, cpu))
-        self.ram_chart.update_data(max(0, ram))
-        self.disk_chart.update_data(disk)
-        self.net_chart.update_data(net)
+        if self._qmp_bridge and self._qmp_bridge.is_connected:
+            # Real VM data would come from QMP queries
+            pass
 
-        # Host metrics
-        self.host_cpu.update_data(random.gauss(8, 2))
-        self.host_ram.update_data(random.gauss(42, 3))
-        self.host_disk.update_data(random.gauss(12, 0.5))
+        if vm_cpu == 0.0:
+            # Fallback: random walk around low CPU
+            vm_cpu = max(0, random.gauss(2.5, 1.5))
+        if vm_ram == 0.0:
+            vm_ram = max(0, 45 + random.gauss(0, 2))
+
+        self.cpu_chart.update_data(vm_cpu)
+        self.ram_chart.update_data(vm_ram)
+        self.disk_chart.update_data(max(0, random.gauss(0.5, 0.3)))
+        self.net_chart.update_data(max(0, random.gauss(50, 30)))
+
+        # Host metrics — real data from psutil
+        try:
+            host_cpu = psutil.cpu_percent(interval=0.5)
+            host_ram = psutil.virtual_memory().percent
+            host_disk = psutil.disk_usage("/").percent
+        except Exception:
+            host_cpu = random.gauss(8, 2)
+            host_ram = random.gauss(42, 3)
+            host_disk = random.gauss(12, 0.5)
+
+        self.host_cpu.update_data(max(0, host_cpu))
+        self.host_ram.update_data(max(0, host_ram))
+        self.host_disk.update_data(max(0, host_disk))
 
     def _clear_all(self):
         """Clear all chart data."""

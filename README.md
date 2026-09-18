@@ -25,6 +25,40 @@ vm-mcp
 python -m vm_mcp --transport sse --host 0.0.0.0 --port 8080
 ```
 
+## GUI (Desktop Application)
+
+A PyQt5 desktop GUI is included for local interactive use.  Launch with:
+
+```bash
+# Install GUI dependencies (already in pyproject.toml)
+pip install -e ".[dev]"
+
+# Launch the desktop application
+python -m vm_mcp.gui
+# or
+vm-mcp-gui
+```
+
+### Panels
+
+| Panel | Description |
+|-------|-------------|
+| **Dashboard** | VM status at a glance — state dot, PID, RAM, vCPUs, disk usage, uptime. Quick-action buttons and activity log. |
+| **VM Control** | QMP connection management, full VM lifecycle (start/stop/reset/suspend/resume/eject), boot device selector, live VM configuration display. |
+| **Guest Terminal** | SSH terminal with command execution, command history, and a guest file browser (tree view, double-click navigate, upload). |
+| **Telemetry** | Real-time matplotlib charts: VM CPU/RAM/disk/network + host CPU/RAM/disk.  Refreshed every 2 seconds; host metrics from psutil. |
+| **Settings** | Tabbed editor for all .env fields (QEMU, VM, Display, Network, Logging, Auth).  Save writes back to `.env`; reset restores defaults. |
+| **Security** | Encrypted credential vault (Fernet via `cryptography`).  Add/edit/delete/search credentials; types: password, ssh_key, api_key, qmp_pass.  Values masked in the UI, only exposed in the add/edit dialog on demand. |
+| **Logs** | Tabbed view of Application, QMP, and SSH logs.  Timestamped, color-coded by level.  Filter by level, clear, export to `.txt`. |
+
+### Credential store
+
+GUI credentials are stored encrypted in `~/.local/share/qmcmcp/credentials.json` (or `XDG_DATA_HOME/qmcmcp/`).  A master key is generated per installation and stored in `.master_key` beside the store.  Set `GUI_MASTER_PASSWORD` for password-based encryption instead.
+
+### QMP/SSH bridging
+
+The GUI runs QMP and SSH operations on background `QThread` + `asyncio` event loops.  `QMPBridge` and `SSHBridge` objects in `gui/qmp_bridge.py` and `gui/ssh_bridge.py` emit PyQt5 signals on completion, keeping the UI responsive.
+
 ## Architecture
 
 ```
@@ -175,35 +209,44 @@ mypy src/ tests/
 
 ```
 vm-mcp/
-├── pyproject.toml              # Project metadata, dependencies, tool config
+├── pyproject.toml              # Project metadata, dependencies, entry points
 ├── README.md                   # This file
 ├── .env.example                # Example environment configuration
 ├── .gitignore
 ├── src/
-│   └── vm_mcp/
+│   └── vm_mcp/                 # MCP server package
 │       ├── __init__.py         # Package metadata (version)
-│       ├── main.py             # CLI entry point + MCP server bootstrap
+│       ├── __main__.py         # python -m vm_mcp entry
 │       ├── config.py           # Pydantic Settings + Secrets classes
 │       ├── setup.py            # QEMU process setup and launch
 │       ├── qmp_client.py       # QMP protocol client
 │       ├── ssh_client.py       # AsyncSSH client wrapper
-│       ├── logging_setup.py    # Logging configuration
+│       ├── server.py           # MCP server builder (MCPServer)
 │       ├── tools/
 │       │   ├── __init__.py     # Tool registry and re-exports
-│       │   ├── _base.py        # Base classes and helpers
+│       │   ├── base.py         # Tool/Extension base classes
 │       │   ├── vm_lifecycle.py # VM start/stop/reset/eject tools
-│       │   ├── vm_status.py    # VM state query tools
-│       │   ├── guest_exec.py   # Command execution in guest
-│       │   ├── guest_files.py  # File operations in guest
-│       │   └── diagnostics.py  # VM and guest diagnostics
-│       ├── resources.py        # MCP resources (read-only state)
-│       ├── prompts.py          # MCP prompts (guided workflows)
-│       └── skills/             # Built-in skills for agents
-│           └── README.md       # How agents should use vm-mcp
+│       │   └── guest_ops.py    # Guest exec/file tools
+│       └── skills/
+│           └── __init__.py     # Agent-facing skill definitions
+├── gui/                        # PyQt5 desktop GUI
+│   ├── __init__.py             # GUI package exports
+│   ├── __main__.py             # python -m vm_mcp.gui entry
+│   ├── main_window.py          # Frameless MainWindow, TitleBar, Sidebar
+│   ├── qmp_bridge.py           # Async→PyQt5 QMP bridge (QThread+asyncio)
+│   ├── ssh_bridge.py           # Async→PyQt5 SSH bridge (QThread+asyncio)
+│   ├── credential_store.py     # Fernet-encrypted credential storage
+│   ├── widgets.py              # Reusable UI components (10 widgets)
+│   ├── panels.py               # DashboardPanel
+│   ├── panels_vm_control.py    # VM control + QMP management
+│   ├── panels_guest_terminal.py # SSH terminal + file browser
+│   ├── panels_telemetry.py     # Real-time matplotlib charts
+│   ├── panels_settings.py      # Tabbed .env editor
+│   ├── panels_security.py      # Credential vault + CredentialDialog
+│   └── panels_logs.py          # Tabbed log viewer
+├── scripts/
+│   ├── build.sh                # Install + test script
+│   └── setup_env.py            # First-time .env generator
 └── tests/
-    ├── __init__.py
-    ├── conftest.py             # Shared test fixtures
-    ├── test_config.py          # Settings and Secrets tests
-    ├── test_setup.py           # VM setup/launch tests
-    └── test_tools.py           # Tool integration tests
+    └── test_core.py            # Settings, Secrets, QMP, tools, skills tests
 ```

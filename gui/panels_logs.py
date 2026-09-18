@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QCheckBox,
     QComboBox,
-    QTextEdit,
+    QTextBrowser,
     QMessageBox,
     QFileDialog,
     QSizePolicy,
@@ -153,10 +153,10 @@ class LogsPanel(QWidget):
         app_log_layout.setContentsMargins(0, 0, 0, 0)
         app_log_layout.setSpacing(0)
 
-        self.app_log_view = QTextEdit()
+        self.app_log_view = QTextBrowser()
         self.app_log_view.setReadOnly(True)
         self.app_log_view.setStyleSheet("""
-            QTextEdit {
+            QTextBrowser {
                 background: #0f172a;
                 color: #e2e8f0;
                 border: none;
@@ -175,10 +175,10 @@ class LogsPanel(QWidget):
         qmp_log_layout.setContentsMargins(0, 0, 0, 0)
         qmp_log_layout.setSpacing(0)
 
-        self.qmp_log_view = QTextEdit()
+        self.qmp_log_view = QTextBrowser()
         self.qmp_log_view.setReadOnly(True)
         self.qmp_log_view.setStyleSheet("""
-            QTextEdit {
+            QTextBrowser {
                 background: #0f172a;
                 color: #e2e8f0;
                 border: none;
@@ -197,10 +197,10 @@ class LogsPanel(QWidget):
         ssh_log_layout.setContentsMargins(0, 0, 0, 0)
         ssh_log_layout.setSpacing(0)
 
-        self.ssh_log_view = QTextEdit()
+        self.ssh_log_view = QTextBrowser()
         self.ssh_log_view.setReadOnly(True)
         self.ssh_log_view.setStyleSheet("""
-            QTextEdit {
+            QTextBrowser {
                 background: #0f172a;
                 color: #e2e8f0;
                 border: none;
@@ -265,7 +265,7 @@ class LogsPanel(QWidget):
             from datetime import datetime
             ts = datetime.now().strftime("%H:%M:%S")
             escaped = message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            view.appendHtml(f'<span style="color:{color}">[{ts}] [{level}] {escaped}</span>')
+            view.append(f"<span style=\"color:{color}\">[{ts}] [{level}] {escaped}</span>")
 
     def _update_status(self):
         """Update the status label."""

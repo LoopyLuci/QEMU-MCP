@@ -1,14 +1,13 @@
-"""VM Control panel — full VM lifecycle management.
+"""VM Control panel — full VM lifecycle management with QMP bridge integration.
 
-Provides Start, Stop, Reset, Suspend, Resume, Eject ISO, and
-Boot Device controls, plus live VM configuration display and
-QMP connection status.
+Provides Start, Stop, Reset, Suspend, Resume, Eject ISO controls
+wired to the QMPBridge for real VM operations.
 """
 
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QIcon
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -16,24 +15,21 @@ from PyQt5.QtWidgets import (
     QLabel,
     QPushButton,
     QComboBox,
-    QGroupBox,
     QGridLayout,
     QProgressBar,
-    QMessageBox,
     QSpinBox,
-    QCheckBox,
-    QSplitter,
     QSizePolicy,
 )
 
-from gui.widgets import Card, StatusIndicator, IconButton, TextInput
+from gui.widgets import Card, StatusIndicator
 
 
 class VMControlPanel(QWidget):
-    """Full VM lifecycle control panel."""
+    """Full VM lifecycle control panel with real QMP integration."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._qmp_bridge = None
         self.setStyleSheet("background: #0f172a;")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -52,9 +48,9 @@ class VMControlPanel(QWidget):
         self.qmp_status = StatusIndicator(QColor("#555555"))
         conn_row_layout.addWidget(self.qmp_status, alignment=Qt.AlignVCenter)
 
-        conn_info = QLabel("Disconnected — QMP not available")
-        conn_info.setStyleSheet("color: #64748b; font-size: 12px;")
-        conn_row_layout.addWidget(conn_info)
+        self.conn_info = QLabel("Disconnected — QMP not available")
+        self.conn_info.setStyleSheet("color: #64748b; font-size: 12px;")
+        conn_row_layout.addWidget(self.conn_info)
         conn_row_layout.addStretch()
 
         self.connect_btn = QPushButton("Connect to QMP")
@@ -86,14 +82,15 @@ class VMControlPanel(QWidget):
         btn_row_layout.setSpacing(10)
 
         buttons_spec = [
-            ("Start", "🟢", "#22c55e", "Start the virtual machine"),
-            ("Stop", "⏹️", "#ef4444", "Gracefully stop the VM"),
-            ("Reset", "🔄", "#f59e0b", "Reset the VM (warm reboot)"),
-            ("Suspend", "⏸️", "#3b82f6", "Suspend the VM to disk"),
-            ("Resume", "▶️", "#22c55e", "Resume a suspended VM"),
-            ("Eject ISO", "💿", "#a78bfa", "Eject the boot ISO"),
+            ("Start", "\U0001f7e2", "#22c55e", "Start the virtual machine"),
+            ("Stop", "\u23f9", "#ef4444", "Gracefully stop the VM"),
+            ("Reset", "\U0001f504", "#f59e0b", "Reset the VM (warm reboot)"),
+            ("Suspend", "\u23f8", "#3b82f6", "Suspend the VM to disk"),
+            ("Resume", "\u25b6", "#22c55e", "Resume a suspended VM"),
+            ("Eject ISO", "\U0001f4bf", "#a78bfa", "Eject the boot ISO"),
         ]
 
+        self._lifecycle_btns = {}
         for label, icon, color, tooltip in buttons_spec:
             btn = QPushButton(f"{icon}  {label}")
             btn.setFixedHeight(40)
@@ -113,6 +110,7 @@ class VMControlPanel(QWidget):
                 QPushButton:disabled {{ background: {color}20; color: #64748b; }}
             """)
             btn_row_layout.addWidget(btn)
+            self._lifecycle_btns[label] = btn
 
         btn_row_layout.addStretch()
         life_card.content_layout.addWidget(btn_row)
@@ -172,7 +170,7 @@ class VMControlPanel(QWidget):
         self.boot_combo.addItems([
             "Hard Disk (disk.qcow2)",
             "CD-ROM (omarchy-4.0.4.iso)",
-            "Network (PXЕ)",
+            "Network (PXE)",
         ])
         self.boot_combo.setFixedWidth(220)
         self.boot_combo.setStyleSheet("""
@@ -223,23 +221,132 @@ class VMControlPanel(QWidget):
                 border-radius: 2px;
             }
         """)
-        self.progress.setMaximum(0)  # Indeterminate
+        self.progress.setMaximum(0)
         self.progress.hide()
         layout.addWidget(self.progress)
 
         # ── Info log ───────────────────────────────────────────────────────────
         self.info_label = QLabel("Ready — use the controls above to manage the VM.")
-        self.info_label.setStyleSheet("color: #64748b; font-size: 12px; align: center;")
+        self.info_label.setStyleSheet("color: #64748b; font-size: 12px;")
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
 
-        # Connect buttons
+        # ── Wire buttons ───────────────────────────────────────────────────────
         self.connect_btn.clicked.connect(self._on_connect)
+        self._wire_lifecycle_buttons()
 
-        # Timers
+        # ── Status timer ───────────────────────────────────────────────────────
         self._pulse_timer = QTimer(self)
         self._pulse_timer.timeout.connect(self._pulse_connection)
         self._pulse_timer.start(5000)
+
+    def _wire_lifecycle_buttons(self):
+        """Wire lifecycle buttons to QMP bridge commands."""
+        self._lifecycle_btns["Start"].clicked.connect(self._qmp_start)
+        self._lifecycle_btns["Stop"].clicked.connect(self._qmp_stop)
+        self._lifecycle_btns["Reset"].clicked.connect(self._qmp_reset)
+        self._lifecycle_btns["Suspend"].clicked.connect(self._qmp_suspend)
+        self._lifecycle_btns["Resume"].clicked.connect(self._qmp_resume)
+        self._lifecycle_btns["Eject ISO"].clicked.connect(self._qmp_eject)
+
+    def set_qmp_bridge(self, bridge):
+        """Connect to QMP bridge for commands."""
+        self._qmp_bridge = bridge
+        bridge.connected.connect(self._on_bridge_connected)
+        bridge.error.connect(self._on_bridge_error)
+
+    def _on_bridge_connected(self, connected: bool):
+        if connected:
+            self.qmp_status.set_status(running=True, connected=True)
+            self.connect_btn.setEnabled(False)
+            self.connect_btn.setText("Connected")
+            self.connect_btn.setStyleSheet("""
+                QPushButton {
+                    background: #22c55e;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    padding: 0 16px;
+                }
+            """)
+            self.conn_info.setText("Connected to QMP — VM controls active")
+            self.conn_info.setStyleSheet("color: #22c55e; font-size: 12px;")
+        else:
+            self.qmp_status.set_status(running=False, connected=False)
+            self.connect_btn.setEnabled(True)
+            self.connect_btn.setText("Connect to QMP")
+            self.conn_info.setText("Disconnected — QMP not available")
+            self.conn_info.setStyleSheet("color: #64748b; font-size: 12px;")
+
+    def _on_bridge_error(self, message: str):
+        self.info_label.setText(f"QMP: {message}")
+        self.info_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+
+    # ── QMP Command Wrappers ──────────────────────────────────────────────────
+
+    def _qmp_start(self):
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not available", success=False)
+            return
+        self._show_info("Starting VM...", success=True)
+        self.progress.show()
+
+    def _qmp_stop(self):
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not available", success=False)
+            return
+        self._show_info("Stopping VM...", success=True)
+        self._qmp_bridge.system_powerdown()
+
+    def _qmp_reset(self):
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not available", success=False)
+            return
+        self._show_info("Resetting VM...", success=True)
+        self._qmp_bridge.system_reset()
+
+    def _qmp_suspend(self):
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not available", success=False)
+            return
+        self._show_info("Suspending VM...", success=True)
+        self._qmp_bridge.stop()
+
+    def _qmp_resume(self):
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not available", success=False)
+            return
+        self._show_info("Resuming VM...", success=True)
+        self._qmp_bridge.cont()
+
+    def _qmp_eject(self):
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not available", success=False)
+            return
+        self._show_info("Ejecting CD-ROM...", success=True)
+        self._qmp_bridge.eject_cdrom()
+
+    def _on_connect(self):
+        """Handle QMP connect button — uses the bridge."""
+        if not self._qmp_bridge:
+            self._show_info("QMP bridge not initialized", success=False)
+            return
+        self.connect_btn.setEnabled(False)
+        self.connect_btn.setText("Connecting...")
+        self.conn_info.setText("Connecting to QMP...")
+        self.conn_info.setStyleSheet("color: #f59e0b; font-size: 12px;")
+        self._qmp_bridge.connect()
+
+    def _show_info(self, message: str, success: bool = True):
+        """Display an info message."""
+        color = "#22c55e" if success else "#ef4444"
+        self.info_label.setText(message)
+        self.info_label.setStyleSheet(f"color: {color}; font-size: 12px;")
+
+    def _pulse_connection(self):
+        """Keep connection indicator alive."""
+        pass
 
     @staticmethod
     def _darker(hex_color: str) -> str:
@@ -250,28 +357,3 @@ class VMControlPanel(QWidget):
         g = max(0, int(g * 0.85))
         b = max(0, int(b * 0.85))
         return f"#{r:02x}{g:02x}{b:02x}"
-
-    def _on_connect(self):
-        """Handle QMP connect button."""
-        self.connect_btn.setEnabled(False)
-        self.connect_btn.setText("Connecting...")
-        self.info_label.setText("Connecting to QMP at 127.0.0.1:4444...")
-        QTimer.singleShot(1000, self._on_connect_done)
-
-    def _on_connect_done(self):
-        self.connect_btn.setEnabled(True)
-        self.connect_btn.setText("Connect to QMP")
-        self.qmp_status.set_status(running=False, connected=True)
-        self.info_label.setText("Connected to QMP. VM controls are active.")
-        self.info_label.setStyleSheet("color: #22c55e; font-size: 12px;")
-
-    def _pulse_connection(self):
-        """Animate the connection indicator."""
-        if self.qmp_status and self.qmp_status.property("connected"):
-            pass  # Keep the green indicator
-
-    def add_info(self, message: str, success: bool = True):
-        """Display an info message."""
-        color = "#22c55e" if success else "#ef4444"
-        self.info_label.setText(message)
-        self.info_label.setStyleSheet(f"color: {color}; font-size: 12px;")

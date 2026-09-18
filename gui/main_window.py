@@ -313,6 +313,27 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.status_label)
         main_layout.addWidget(self.status_bar)
 
+        # ── QMP Bridge (background async → PyQt5 signals) ─────────────────────
+        from gui.qmp_bridge import QMPBridge
+        self.qmp_bridge = QMPBridge()
+        self.qmp_bridge.start()
+        self.qmp_bridge.connected.connect(self._on_qmp_connected)
+        self.qmp_bridge.vm_status.connect(self._on_vm_status)
+        self.qmp_bridge.error.connect(self._on_qmp_error)
+        self.qmp_bridge.command_result.connect(self._on_qmp_command)
+        self.qmp_client = None  # legacy compat
+
+        # ── SSH Bridge ────────────────────────────────────────────────────────
+        from gui.ssh_bridge import SSHBridge
+        self.ssh_bridge = SSHBridge()
+        self.ssh_bridge.start()
+        self.ssh_bridge.connected.connect(self._on_ssh_connected)
+        self.ssh_bridge.command_output.connect(self._on_ssh_command_output)
+        self.ssh_bridge.file_content.connect(self._on_ssh_file_content)
+        self.ssh_bridge.file_list.connect(self._on_ssh_file_list)
+        self.ssh_bridge.error.connect(self._on_ssh_error)
+        self.ssh_bridge.connected_to.connect(self._on_ssh_connected_to)
+
         # ── Build panels ───────────────────────────────────────────────────────
         self._build_panels()
 
@@ -325,8 +346,29 @@ class MainWindow(QMainWindow):
 
         # ── Telemetry timer ────────────────────────────────────────────────────
         self._telemetry_timer = QTimer(self)
-        self._telemetry_timer.timeout.connect(self._update_telemetry)
+        # Don't connect — telemetry is handled by TelemetryPanel's own timer
         self._telemetry_timer.start(2000)
+
+        # ── QMP Bridge (background async → PyQt5 signals) ─────────────────────
+        from gui.qmp_bridge import QMPBridge
+        self.qmp_bridge = QMPBridge()
+        self.qmp_bridge.start()
+        self.qmp_bridge.connected.connect(self._on_qmp_connected)
+        self.qmp_bridge.vm_status.connect(self._on_vm_status)
+        self.qmp_bridge.error.connect(self._on_qmp_error)
+        self.qmp_bridge.command_result.connect(self._on_qmp_command)
+        self.qmp_client = None  # legacy compat
+
+        # ── SSH Bridge ────────────────────────────────────────────────────────
+        from gui.ssh_bridge import SSHBridge
+        self.ssh_bridge = SSHBridge()
+        self.ssh_bridge.start()
+        self.ssh_bridge.connected.connect(self._on_ssh_connected)
+        self.ssh_bridge.command_output.connect(self._on_ssh_command_output)
+        self.ssh_bridge.file_content.connect(self._on_ssh_file_content)
+        self.ssh_bridge.file_list.connect(self._on_ssh_file_list)
+        self.ssh_bridge.error.connect(self._on_ssh_error)
+        self.ssh_bridge.connected_to.connect(self._on_ssh_connected_to)
 
         # ── Initial status ─────────────────────────────────────────────────────
         self._update_status_indicators()
@@ -356,6 +398,17 @@ class MainWindow(QMainWindow):
             self.panels[name] = panel
             self.panel_stack.addWidget(panel)
 
+        # ── Wire bridges to panels ────────────────────────────────────────────
+        if "dashboard" in self.panels:
+            self.panels["dashboard"].set_qmp_bridge(self.qmp_bridge)
+        if "vmcontrol" in self.panels:
+            self.panels["vmcontrol"].set_qmp_bridge(self.qmp_bridge)
+        if "guestterminal" in self.panels:
+            self.panels["guestterminal"].set_ssh_bridge(self.ssh_bridge)
+        if "telemetry" in self.panels:
+            self.panels["telemetry"].set_qmp_bridge(self.qmp_bridge)
+            self.panels["telemetry"].set_ssh_bridge(self.ssh_bridge)
+
         self._switch_panel("dashboard")
 
     def _switch_panel(self, name: str):
@@ -365,25 +418,86 @@ class MainWindow(QMainWindow):
 
     def _update_status_indicators(self):
         """Update the title bar status dot and text."""
-        if self.qmp_client and self.qmp_client.is_connected:
+        if self.qmp_bridge and self.qmp_bridge.is_connected:
             self.title_bar.status_dot.set_status(running=True, connected=True)
-            self.title_bar.findChild(QLabel, None)  # refresh text if needed
+        elif self.ssh_bridge and self.ssh_bridge.is_connected:
+            self.title_bar.status_dot.set_status(running=False, connected=True)
         else:
             self.title_bar.status_dot.set_status(running=False, connected=False)
 
-    def _update_telemetry(self):
-        """Called by QTimer every 2 seconds to refresh telemetry charts."""
-        # Placeholder — real implementation reads from QMP and guest
-        panel = self.panels.get("telemetry")
-        if panel and hasattr(panel, "_refresh_charts"):
-            panel._refresh_charts()
+    # ── QMP Bridge Callbacks ──────────────────────────────────────────────────
+
+    def _on_qmp_connected(self, connected: bool):
+        self._update_status_indicators()
+        if connected:
+            self.status_label.setText("Connected to QMP")
+            self.status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
+            # Refresh status immediately
+            self.qmp_bridge.get_status()
+        else:
+            self.status_label.setText("QMP connection failed")
+            self.status_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+
+    def _on_vm_status(self, status: dict):
+        """Update dashboard with VM status from QMP."""
+        panel = self.panels.get("dashboard")
+        if panel and hasattr(panel, "update_vm_status"):
+            panel.update_vm_status(status)
+
+    def _on_qmp_error(self, message: str):
+        self.status_label.setText(f"QMP: {message}")
+        self.status_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+
+    def _on_qmp_command(self, result: dict):
+        """Handle QMP command result."""
+        self.status_label.setText(f"QMP command: {result.get('return', result.get('error', 'ok'))}")
+        self.status_label.setStyleSheet("color: #38bdf8; font-size: 12px;")
+
+    # ── SSH Bridge Callbacks ─────────────────────────────────────────────────
+
+    def _on_ssh_connected(self, connected: bool):
+        if connected:
+            self.status_label.setText("Connected to guest SSH")
+            self.status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
+        else:
+            self.status_label.setText("SSH connection failed")
+            self.status_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+
+    def _on_ssh_connected_to(self, address: str):
+        self.status_label.setText(f"SSH connected to {address}")
+        self.status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
+
+    def _on_ssh_command_output(self, output: str):
+        """Send command output to guest terminal."""
+        panel = self.panels.get("guestterminal")
+        if panel and hasattr(panel, "append_command_output"):
+            panel.append_command_output(output)
+
+    def _on_ssh_file_content(self, content: str):
+        """Send file content to guest terminal."""
+        panel = self.panels.get("guestterminal")
+        if panel and hasattr(panel, "append_file_content"):
+            panel.append_file_content(content)
+
+    def _on_ssh_file_list(self, files: list):
+        """Send file listing to guest terminal."""
+        panel = self.panels.get("guestterminal")
+        if panel and hasattr(panel, "populate_files"):
+            panel.populate_files(files)
+
+    def _on_ssh_error(self, message: str):
+        panel = self.panels.get("guestterminal")
+        if panel and hasattr(panel, "append_error"):
+            panel.append_error(message)
 
     def closeEvent(self, event):
         """Clean up on close."""
-        if self.qmp_client:
-            # Don't disconnect — VM should keep running
-            pass
+        # Don't disconnect — VM should keep running
         self._telemetry_timer.stop()
+        if self.qmp_bridge:
+            self.qmp_bridge.stop()
+        if self.ssh_bridge:
+            self.ssh_bridge.stop()
         event.accept()
 
 

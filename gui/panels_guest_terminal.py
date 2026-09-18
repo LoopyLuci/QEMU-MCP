@@ -92,8 +92,8 @@ class GuestTerminalPanel(QWidget):
         # ── Split View: Terminal + File Browser ───────────────────────────────
         splitter = QSplitter(Qt.Horizontal, self)
         splitter.setStyleSheet("background: #0f172a;")
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 0.5)
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 1)
 
         # ── Terminal Panel ─────────────────────────────────────────────────────
         term_card = Card("Terminal")
@@ -265,6 +265,9 @@ class GuestTerminalPanel(QWidget):
         self.refresh_files_btn.clicked.connect(self._refresh_files)
         self.file_tree.file_selected.connect(self._on_file_select)
 
+        # SSH bridge
+        self._ssh_bridge = None
+
         # Seed terminal with welcome
         self.terminal.append_line("QEMU-MCP Guest Terminal — connected to omarchy-vm", "INFO")
         self.terminal.append_line("Type commands and press Enter to execute.", "INFO")
@@ -272,25 +275,20 @@ class GuestTerminalPanel(QWidget):
         self.terminal.append_line("", "INFO")
 
     def _on_connect(self):
-        """Simulate SSH connection."""
+        """Connect to guest SSH via the SSH bridge."""
+        if not self._ssh_bridge:
+            self.terminal.append_line("SSH bridge not available", "ERROR")
+            return
         self.connect_btn.setEnabled(False)
         self.connect_btn.setText("Connecting...")
         self.status_label.setText("Connecting to guest SSH...")
         self.status_label.setStyleSheet("color: #f59e0b; font-size: 12px;")
-
-        QTimer.singleShot(800, self._on_connect_done)
-
-    def _on_connect_done(self):
-        self.connect_btn.setEnabled(True)
-        self.connect_btn.setText("Connect to Guest")
-        self.ssh_status.setText("Connected (127.0.0.1:2222)")
-        self.ssh_status.setStyleSheet("color: #22c55e; font-size: 12px;")
-        self.status_label.setText("Connected to guest SSH. Type commands below.")
-        self.status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
-        self.terminal.append_line("SSH connection established.", "INFO")
-        self._refresh_files()
+        self._ssh_bridge.connect()
 
     def _on_disconnect(self):
+        """Disconnect from guest SSH."""
+        if self._ssh_bridge:
+            self._ssh_bridge.disconnect()
         self.ssh_status.setText("Disconnected")
         self.ssh_status.setStyleSheet("color: #ef4444; font-size: 12px;")
         self.status_label.setText("Disconnected from guest.")
@@ -298,21 +296,39 @@ class GuestTerminalPanel(QWidget):
         self.terminal.append_line("SSH connection closed.", "INFO")
 
     def _execute_command(self):
-        """Execute a command from the input field."""
+        """Execute a command on the guest via SSH bridge."""
         cmd = self.cmd_input.text().strip()
         if not cmd:
+            return
+        if not self._ssh_bridge:
+            self.terminal.append_line("SSH not connected — cannot execute commands", "ERROR")
             return
 
         self.terminal.append_command(cmd)
         self.cmd_input.clear()
-
-        # Simulate command output
-        QTimer.singleShot(200, lambda: self._simulate_output(cmd))
+        self._ssh_bridge.run_command(cmd, timeout=30, max_output=10000)
 
         # Add to history
         self.history_list.insertItem(0, cmd)
         if self.history_list.count() > 50:
             self.history_list.takeItem(self.history_list.count() - 1)
+
+    def _on_file_select(self, path: str):
+        """Handle file double-click in tree."""
+        if path.endswith("/"):
+            self.nav_path.setText(path.rstrip("/"))
+            self._ssh_bridge.list_dir(path)
+        else:
+            self.terminal.append_line(f"Selected: {path}", "OUTPUT")
+            self.terminal.append_line("Use Download button to retrieve this file.", "INFO")
+
+    def _refresh_files(self):
+        """List guest directory via SSH bridge."""
+        if self._ssh_bridge:
+            self._ssh_bridge.list_dir("/home/omarchyvm")
+        else:
+            # Fallback to sample data for demo
+            self._populate_sample_files()
 
     def _simulate_output(self, cmd: str):
         """Simulate command output for demo."""
@@ -355,15 +371,101 @@ class GuestTerminalPanel(QWidget):
             # Simulate upload
             QTimer.singleShot(1000, lambda: self.terminal.append_line(f"Upload complete: {path} → /home/omarchyvm/", "OUTPUT"))
 
+    def set_ssh_bridge(self, bridge):
+        """Connect to SSH bridge for real commands and file operations."""
+        self._ssh_bridge = bridge
+        bridge.command_output.connect(self._on_command_output)
+        bridge.file_content.connect(self._on_file_content)
+        bridge.file_list.connect(self._on_file_list)
+        bridge.error.connect(self._on_ssh_error)
+        bridge.connected.connect(self._on_bridge_connected)
+        bridge.connected_to.connect(self._on_bridge_connected_to)
+
+    def _on_bridge_connected(self, connected: bool):
+        if connected:
+            self.ssh_status.setText("Connected")
+            self.ssh_status.setStyleSheet("color: #22c55e; font-size: 12px;")
+            self.connect_btn.setEnabled(False)
+            self.connect_btn.setText("Connected")
+        else:
+            self.ssh_status.setText("Connection failed")
+            self.ssh_status.setStyleSheet("color: #ef4444; font-size: 12px;")
+            self.connect_btn.setEnabled(True)
+            self.connect_btn.setText("Connect to Guest")
+
+    def _on_bridge_connected_to(self, address: str):
+        self.ssh_status.setText(f"Connected to {address}")
+        self.ssh_status.setStyleSheet("color: #22c55e; font-size: 12px;")
+        self.connect_btn.setEnabled(False)
+        self.connect_btn.setText("Connected")
+        self.status_label.setText(f"SSH connected to {address}")
+        self.status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
+        self.terminal.append_line(f"SSH connection established to {address}", "INFO")
+        self._refresh_files()
+
+    def _on_ssh_error(self, message: str):
+        self.terminal.append_line(f"ERROR: {message}", "ERROR")
+        self.status_label.setText(f"Error: {message}")
+        self.status_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+
+    def _on_command_output(self, output: str):
+        self.terminal.append_output(output)
+
+    def _on_file_content(self, content: str):
+        self.terminal.append_output(content)
+
+    def _on_file_list(self, files: list):
+        self._populate_file_tree(files)
+
+    def _populate_file_tree(self, files: list):
+        """Populate file tree from SSH directory listing."""
+        self.file_tree.clear()
+        for f in files:
+            path = f.get("path", f.get("name", ""))
+            name = f.get("name", path.split("/")[-1])
+            size = f.get("size", "")
+            mtime = f.get("mtime", "")
+            is_dir = f.get("type") == "dir"
+            child = QTreeWidgetItem(self.file_tree, [name, str(size), mtime])
+            child.setData(0, Qt.UserRole, path)
+            if is_dir:
+                child.setFlags(child.flags() | Qt.ItemIsAutoTristate)
+        self.file_tree.expandAll()
+
+    def _populate_sample_files(self):
+        """Fallback sample file listing when SSH bridge not available."""
+        sample_files = [
+            {"name": "home", "type": "dir", "path": "/home", "size": "", "mtime": "2026-01-01 12:00"},
+            {"name": "omarchyvm", "type": "dir", "path": "/home/omarchyvm", "size": "", "mtime": "2026-01-01 12:00"},
+            {"name": ".bashrc", "type": "file", "path": "/home/omarchyvm/.bashrc", "size": "220 B", "mtime": "2026-01-01 11:00"},
+            {"name": ".profile", "type": "file", "path": "/home/omarchyvm/.profile", "size": "807 B", "mtime": "2026-01-01 11:00"},
+            {"name": "Documents", "type": "dir", "path": "/home/omarchyvm/Documents", "size": "", "mtime": "2026-01-01 12:00"},
+            {"name": "Downloads", "type": "dir", "path": "/home/omarchyvm/Downloads", "size": "", "mtime": "2026-01-01 12:00"},
+            {"name": "Projects", "type": "dir", "path": "/home/omarchyvm/Projects", "size": "", "mtime": "2026-01-01 12:00"},
+            {"name": "README.md", "type": "file", "path": "/home/omarchyvm/README.md", "size": "1.2 KB", "mtime": "2026-01-01 12:05"},
+        ]
+        self._populate_file_tree(sample_files)
+        self.nav_path.setText("/home/omarchyvm")
+
+    def _on_upload(self):
+        """Upload a file to the guest via SSH bridge."""
+        path, _ = QFileDialog.getOpenFileName(self, "Upload File to Guest", "", "All Files (*)")
+        if path:
+            self.terminal.append_line(f"Uploading: {path}...", "COMMAND")
+            # Read file content and write via SSH
+            try:
+                content = open(path, "r", encoding="utf-8").read()
+                guest_path = "/home/omarchyvm/" + path.split("/")[-1]
+                self._ssh_bridge.write_file(guest_path, content)
+                self.terminal.append_line(f"Upload complete: {path} → {guest_path}", "OUTPUT")
+            except Exception as e:
+                self.terminal.append_line(f"Upload failed: {e}", "ERROR")
+
     def _on_file_select(self, path: str):
         """Handle file double-click in tree."""
         if path.endswith("/"):
             self.nav_path.setText(path.rstrip("/"))
-            self._refresh_files()
+            self._ssh_bridge.list_dir(path)
         else:
             self.terminal.append_line(f"Selected: {path}", "OUTPUT")
             self.terminal.append_line("Use Download button to retrieve this file.", "INFO")
-
-
-# Keep the original GuestTerminalPanel class name for compatibility
-GuestTerminalPanel = GuestTerminalPanel

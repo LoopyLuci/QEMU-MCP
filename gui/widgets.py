@@ -333,7 +333,7 @@ class TelemetryChart(QWidget):
         layout.setSpacing(0)
 
         self.figure = __import__("matplotlib.figure").figure.Figure(figsize=(4, 2.5), dpi=100)
-        self.canvas = __import__("matplotlib.backends.backend_qt").backends_qt.FigureCanvasQTAgg(self.figure)
+        self.canvas = __import__("matplotlib.backends.backend_qtagg", fromlist=["FigureCanvasQTAgg"]).FigureCanvasQTAgg(self.figure)
         layout.addWidget(self.canvas)
 
         self._ax = self.figure.add_subplot(111)

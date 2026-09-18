@@ -386,8 +386,8 @@ class SecurityPanel(QWidget):
         detail_card.content_layout.addWidget(detail_inner)
         splitter.addWidget(detail_card)
 
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 0.4)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter)
 
         # ── Add Credential Button ──────────────────────────────────────────────
