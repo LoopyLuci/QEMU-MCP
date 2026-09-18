@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
 )
 
-from gui.widgets import Card, TextInput, TextInput
+from gui.widgets import Card, TextInput
 
 
 class SettingsPanel(QWidget):
@@ -541,13 +541,71 @@ class SettingsPanel(QWidget):
         save_card.content_layout.addWidget(save_row)
         save_card.content_layout.addStretch()
 
+        refresh_btn = QPushButton("Refresh from .env")
+        refresh_btn.setFixedHeight(32)
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                color: #64748b;
+                border: 1px solid #334155;
+                border-radius: 4px;
+                font-size: 12px;
+                padding: 0 16px;
+            }
+            QPushButton:hover { color: #94a3b8; border-color: #475569; }
+        """)
+        save_row_layout.addWidget(refresh_btn)
+
         save_btn.clicked.connect(self._save_settings)
         reset_btn.clicked.connect(self._reset_defaults)
+        refresh_btn.clicked.connect(self._load_from_env)
 
         # Status
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: #64748b; font-size: 12px;")
         layout.addWidget(self.status_label)
+
+    def _load_from_env(self):
+        """Reload all fields from the current .env file."""
+        from pathlib import Path
+        import os
+
+        env_path = Path(".env")
+        if not env_path.exists():
+            self.status_label.setText("✗ No .env file found")
+            self.status_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+            return
+
+        # Load into a fresh settings object to get processed values
+        from vm_mcp.config import VmMCPSettings
+
+        # Temporarily point settings at this env file
+        os.environ["VM_MCP_ENV_FILE"] = str(env_path.resolve())
+        settings = VmMCPSettings()
+
+        self.qemu_bin_input.setText(settings.qemu_binary)
+        self.qemu_args_input.setText(settings.qemu_extra_args or "")
+        self.vm_name_input.setText(settings.vm_name)
+        self.disk_input.setText(settings.vm_disk_path)
+        self.iso_input.setText(settings.vm_iso_path)
+        self.ram_spin.setValue(settings.vm_ram_mb)
+        self.cpu_spin.setValue(settings.vm_cpus)
+        self.hostname_input.setText(settings.vm_hostname)
+        self.display_combo.setCurrentText(settings.display.upper() if settings.display else "SDL")
+        self.gl_check.setChecked(settings.gl)
+        self.eject_check.setChecked(settings.auto_eject_iso)
+        self.ssh_host_input.setText(settings.ssh_host)
+        self.ssh_port_spin.setValue(settings.ssh_port)
+        self.guest_user_input.setText(settings.ssh_username)
+        self.log_level_combo.setCurrentText(getattr(settings, "log_level", "INFO").upper())
+        self.log_file_input.setText(settings.log_file or "")
+        auth = getattr(settings, "auth_method", "api_key").lower()
+        if auth in ("api_key", "none", "jwt"):
+            self.auth_method_combo.setCurrentText(auth)
+        self.status_label.setText("✓ Settings reloaded from .env")
+        self.status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
+        # Remove the env override so subsequent loads use the default
+        os.environ.pop("VM_MCP_ENV_FILE", None)
 
     def _save_settings(self):
         """Save all settings to .env and config."""

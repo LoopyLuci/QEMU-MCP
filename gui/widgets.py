@@ -37,6 +37,7 @@ from PyQt5.QtWidgets import (
 )
 
 from typing import Optional, List, Dict, Any
+import pathlib
 
 
 # ── Status Indicator ────────────────────────────────────────────────────────────
@@ -405,8 +406,9 @@ class FileTree(QTreeWidget):
 
     file_selected = pyqtSignal(str)
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self, root_path="/"):
+        super().__init__()
+        self.root_path = pathlib.Path(root_path)
         self.setHeaderLabels(["Name", "Size", "Modified"])
         self.header().setSectionResizeMode(0, QHeaderView.Stretch)
         self.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)

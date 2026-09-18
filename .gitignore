@@ -26,6 +26,11 @@ build/
 .DS_Store
 Thumbs.db
 
+# GUI credential store (encrypted secrets — never commit)
+.local/share/qmcmcp/
+XDG_DATA_HOME/qmcmcp/
+%LOCALAPPDATA%\qmcmcp\
+
 # Test artifacts
 .pytest_cache/
 .coverage

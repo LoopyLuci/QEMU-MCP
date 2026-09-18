@@ -254,9 +254,11 @@ class DashboardPanel(QWidget):
             self.status_dot.set_status(running=False, connected=False)
 
         # Try to extract PID from status
-        pid = status.get("pid", status.get("pid", "—"))
+        pid = status.get("pid", "—")
         if isinstance(pid, int):
             self._vm_pid = str(pid)
+            self._stat_labels["PID"].setText(self._vm_pid)
+            self._stat_labels["PID"].setStyleSheet("color: #64748b; font-size: 13px; font-weight: 600;")
 
         # Update stats
         self._update_stats_display()
@@ -267,10 +269,8 @@ class DashboardPanel(QWidget):
 
     def _update_stats_display(self):
         """Refresh the stat labels in the dashboard."""
-        stats = self.findChildren(QLabel)
-        # Find and update stat value labels by matching text
-        for lbl in stats:
-            txt = lbl.text()
-            if txt == "—" and self._vm_pid != "—":
-                lbl.setText(self._vm_pid)
-                lbl.setStyleSheet("color: #64748b; font-size: 13px; font-weight: 600;")
+        if self._vm_pid != "—":
+            self._stat_labels["PID"].setText(self._vm_pid)
+            self._stat_labels["PID"].setStyleSheet("color: #64748b; font-size: 13px; font-weight: 600;")
+        else:
+            self._stat_labels["PID"].setText("—")

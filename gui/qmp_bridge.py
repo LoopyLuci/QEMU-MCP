@@ -32,18 +32,14 @@ class QMPBridge(QObject):
     error = pyqtSignal(str)
     command_result = pyqtSignal(dict)
 
-    def __init__(self, parent=None):
+    def __init__(self, settings, parent=None):
         super().__init__(parent)
-        self._client: QMPClient | None = None
-        self._thread: QThread | None = None
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self._settings = VmMCPSettings()
-        self._secrets = Secrets.from_env()
-        self._secrets_dotenv = Secrets.from_dotenv()
-        if self._secrets_dotenv.has_any_secret():
-            self._secrets = self._secrets_dotenv
+        self._settings = settings
         self._qmp_uri = self._build_uri()
         self._connected = False
+        self._thread: QThread | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._client: QMPClient | None = None
 
     def _build_uri(self) -> str:
         """Build QMP connection URI from settings."""
@@ -227,8 +223,8 @@ class QMPBridge(QObject):
             self.error.emit(f"Eject failed: {e}")
 
 
-def create_qmp_bridge() -> QMPBridge:
+def create_qmp_bridge(settings) -> QMPBridge:
     """Create and start a QMP bridge."""
-    bridge = QMPBridge()
+    bridge = QMPBridge(settings=settings)
     bridge.start()
     return bridge

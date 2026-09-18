@@ -38,16 +38,12 @@ class SSHBridge(QObject):
     progress = pyqtSignal(str)
     connected_to = pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, settings, parent=None):
         super().__init__(parent)
+        self._settings = settings
+        self._connected = False
         self._thread: QThread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
-        self._settings = VmMCPSettings()
-        self._secrets = Secrets.from_env()
-        self._secrets_dotenv = Secrets.from_dotenv()
-        if self._secrets_dotenv.has_any_secret():
-            self._secrets = self._secrets_dotenv
-        self._connected = False
 
     def start(self):
         """Start the background thread and asyncio event loop."""
@@ -172,7 +168,7 @@ class SSHBridge(QObject):
 
     async def _read_file_impl(self, path: str, max_size: int):
         try:
-            content, encoding = await ssh_mod.read_guest_file(
+            content = await ssh_mod.read_guest_file(
                 path, max_bytes=max_size, secrets=self._secrets, settings=self._settings
             )
             if len(content) > max_size:
@@ -258,8 +254,8 @@ class SSHBridge(QObject):
             self.error.emit(f"File remove failed: {e}")
 
 
-def create_ssh_bridge() -> SSHBridge:
+def create_ssh_bridge(settings) -> SSHBridge:
     """Create and start an SSH bridge."""
-    bridge = SSHBridge()
+    bridge = SSHBridge(settings=settings)
     bridge.start()
     return bridge

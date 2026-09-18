@@ -315,7 +315,7 @@ class MainWindow(QMainWindow):
 
         # ── QMP Bridge (background async → PyQt5 signals) ─────────────────────
         from gui.qmp_bridge import QMPBridge
-        self.qmp_bridge = QMPBridge()
+        self.qmp_bridge = QMPBridge(settings=self.settings)
         self.qmp_bridge.start()
         self.qmp_bridge.connected.connect(self._on_qmp_connected)
         self.qmp_bridge.vm_status.connect(self._on_vm_status)
@@ -325,7 +325,7 @@ class MainWindow(QMainWindow):
 
         # ── SSH Bridge ────────────────────────────────────────────────────────
         from gui.ssh_bridge import SSHBridge
-        self.ssh_bridge = SSHBridge()
+        self.ssh_bridge = SSHBridge(settings=self.settings)
         self.ssh_bridge.start()
         self.ssh_bridge.connected.connect(self._on_ssh_connected)
         self.ssh_bridge.command_output.connect(self._on_ssh_command_output)
@@ -351,7 +351,7 @@ class MainWindow(QMainWindow):
 
         # ── QMP Bridge (background async → PyQt5 signals) ─────────────────────
         from gui.qmp_bridge import QMPBridge
-        self.qmp_bridge = QMPBridge()
+        self.qmp_bridge = QMPBridge(settings=self.settings)
         self.qmp_bridge.start()
         self.qmp_bridge.connected.connect(self._on_qmp_connected)
         self.qmp_bridge.vm_status.connect(self._on_vm_status)
@@ -361,7 +361,7 @@ class MainWindow(QMainWindow):
 
         # ── SSH Bridge ────────────────────────────────────────────────────────
         from gui.ssh_bridge import SSHBridge
-        self.ssh_bridge = SSHBridge()
+        self.ssh_bridge = SSHBridge(settings=self.settings)
         self.ssh_bridge.start()
         self.ssh_bridge.connected.connect(self._on_ssh_connected)
         self.ssh_bridge.command_output.connect(self._on_ssh_command_output)

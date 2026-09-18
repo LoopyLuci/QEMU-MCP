@@ -34,7 +34,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
 )
 
-from gui.widgets import Card, TextInput, PasswordInput
+from gui.widgets import Card, TextInput, PasswordInput, CredentialTreeItem
 from gui.credential_store import CredentialStore
 
 
@@ -178,13 +178,13 @@ class CredentialDialog(QDialog):
         store = CredentialStore()
         entry = store.get(cred_id)
         if entry:
-            self.name_input.setText(entry["name"])
-            self.type_combo.setCurrentText(entry["type"])
+            self.name_input.setText(entry.name)
+            self.type_combo.setCurrentText(entry.credential_type)
             # Show value only if the user confirms
             from PyQt5.QtWidgets import QMessageBox
             resp = QMessageBox.question(
                 self, "Show Secret",
-                f"Show the current value of '{entry['name']}'?\n\nWarning: This will briefly expose the secret in this dialog.",
+                f"Show the current value of '{entry.name}'?\n\nWarning: This will briefly expose the secret in this dialog.",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
             )
@@ -469,13 +469,10 @@ class SecurityPanel(QWidget):
         store = CredentialStore()
         self.cred_tree.clear()
 
-        for entry in store.get_all():
-            item = QTreeWidgetItem(self.cred_tree)
-            item.setText(0, entry["name"])
-            item.setText(1, entry["type"])
-            item.setText(2, entry.get("description", "") or "—")
-            item.setText(3, entry.get("updated_at", "")[:19] or "—")
-            item.setData(0, Qt.UserRole, entry["id"])
+        for entry in store.list_all():
+            item = CredentialTreeItem(entry.id, entry.name, entry.credential_type, entry.description)
+            item.setText(3, entry.updated[:19] if entry.updated else "—")
+            item.setData(0, Qt.UserRole, entry.id)
             # Color the type column
             type_colors = {
                 "password": "#f59e0b",
@@ -484,7 +481,7 @@ class SecurityPanel(QWidget):
                 "qmp_pass": "#3b82f6",
                 "other": "#94a3b8",
             }
-            color = QColor(type_colors.get(entry["type"], "#94a3b8"))
+            color = QColor(type_colors.get(entry.credential_type, "#94a3b8"))
             item.setForeground(1, QBrush(color))
             self.cred_tree.addTopLevelItem(item)
 
@@ -501,14 +498,14 @@ class SecurityPanel(QWidget):
             return
 
         self._selected_cred_id = cred_id
-        self.detail_name.setText(entry["name"])
+        self.detail_name.setText(entry.name)
         self.detail_name.setStyleSheet("color: #e2e8f0; font-size: 13px; font-weight: 600;")
-        self.detail_type_label.setText(f"Type: {entry['type']}")
-        self.detail_desc_label.setText(f"Description: {entry.get('description', '—') or '—'}")
-        self.detail_updated_label.setText(f"Updated: {entry.get('updated_at', '')[:19] or '—'}")
+        self.detail_type_label.setText(f"Type: {entry.credential_type}")
+        self.detail_desc_label.setText(f"Description: {entry.description or '—'}")
+        self.detail_updated_label.setText(f"Updated: {entry.updated[:19] if entry.updated else '—'}")
 
         # Show masked value
-        masked = self._mask_value(entry["value"])
+        masked = self._mask_value(entry.value)
         self.detail_value_label.setText(f"Value: {masked}")
         self.detail_value_label.setStyleSheet("color: #f59e0b; font-size: 11px; font-family: monospace;")
 
