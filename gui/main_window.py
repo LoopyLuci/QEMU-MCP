@@ -478,9 +478,12 @@ class MainWindow(QMainWindow):
 
     def _try_auto_reconnect(self):
         """Periodic auto-reconnect: if bridges are running but not connected,
-        retry connecting.  Called every 5 seconds by _reconnect_timer."""
+        retry connecting.  Called every 5 seconds by _reconnect_timer.
+        Only reconnects if the bridge was previously connected (not on first
+        start, to avoid grabbing the sole QMP connection during tests)."""
         if self.qmp_bridge and not self.qmp_bridge.is_connected:
-            self.qmp_bridge.connect()
+            if self.qmp_bridge._ever_connected:
+                self.qmp_bridge.connect()
         if self.ssh_bridge and not self.ssh_bridge.is_connected:
             self.ssh_bridge.connect_ssh()
 

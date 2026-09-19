@@ -152,6 +152,8 @@ class TelemetryPanel(QWidget):
         self._data_timer.timeout.connect(self._refresh_charts)
         self._data_timer.start(2000)
         self._qmp_pid = None
+        self._last_vm_status: dict = {}
+        # Connect to bridge status signal for real-time updates
 
         # Seed initial data
         self._seed_initial_data()

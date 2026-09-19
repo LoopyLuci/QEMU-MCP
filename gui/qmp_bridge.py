@@ -159,20 +159,28 @@ class QMPBridge(QObject):
             self.error.emit(f"Disconnect failed: {e}")
 
     def get_status(self):
-        """Query VM status.  Emits vm_status(dict)."""
+        """Query VM status synchronously. Returns dict or None on failure."""
         if self._loop is None:
             self.error.emit("QMP bridge not started")
-            return
-        asyncio.run_coroutine_threadsafe(self._status_impl(), self._loop)
+            return None
+        fut = asyncio.run_coroutine_threadsafe(self._status_impl(), self._loop)
+        try:
+            return fut.result(timeout=3.0)
+        except Exception as e:
+            logger.error("QMP get_status timed out: %s", e)
+            self.error.emit(f"Status query timed out: {e}")
+            return None
 
     async def _status_impl(self):
         try:
             client = await self._get_client()
             status = await qmp_mod.query_status(client)
             self.vm_status.emit(status)
+            return status
         except Exception as e:
             logger.error("QMP get_status failed: %s", e)
             self.error.emit(f"Status query failed: {e}")
+            return {}
 
     def system_reset(self):
         """Reset the VM (warm reboot)."""
