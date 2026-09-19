@@ -60,7 +60,7 @@ class TestWidgets:
     def test_telemetry_chart(self, qtbot, app):
         from gui.widgets import TelemetryChart
 
-        chart = TelemetryChart("Test Metric", "#38bdf8")
+        chart = TelemetryChart("Test Metric", "Usage %")
         assert chart is not None
         qtbot.addWidget(chart)
 
