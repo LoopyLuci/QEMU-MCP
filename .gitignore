@@ -39,3 +39,5 @@ XDG_DATA_HOME/qmcmcp/
 .pytest_cache/
 .coverage
 htmlcov/
+test-results/
+gui.log
