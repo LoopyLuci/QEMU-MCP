@@ -49,95 +49,84 @@ from gui.widgets import (
     LogEntry,
     CredentialTreeItem,
     FileTree,
+    title_bar_style,
+    button_ghost_style,
+    button_red_style,
 )
+from gui.theme import T
 from gui.credential_store import CredentialStore
 
 
 # ── Title Bar ───────────────────────────────────────────────────────────────────
 
 class TitleBar(QWidget):
-    """Custom frameless window title bar."""
+    """Themed frameless window title bar with status indicator."""
 
-    window_state_changed = pyqtSignal(int)  # Qt.WindowStates
+    window_state_changed = pyqtSignal(int)
 
     def __init__(self, parent: QMainWindow):
         super().__init__(parent)
         self._parent = parent
         self.setFixedHeight(40)
-        self.setStyleSheet("""
-            TitleBar {
-                background: #0f172a;
-                border-bottom: 1px solid #334155;
-            }
-        """)
+        self.setStyleSheet(title_bar_style())
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 8, 0)
-        layout.setSpacing(8)
+        layout.setContentsMargins(T.SM, 0, T.SM, 0)
+        layout.setSpacing(T.SM)
 
-        # App icon + name
+        # Brand icon
         icon_label = QLabel()
-        icon_label.setFixedSize(24, 24)
-        icon_label.setStyleSheet("background: #3b82f6; border-radius: 4px;")
+        icon_label.setFixedSize(T.FS_XL + 4, T.FS_XL + 4)
+        icon_label.setStyleSheet(
+            "background: " + T.BRAND + ";"
+            "border-radius: " + str(T.R_SM) + "px;"
+        )
         icon_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(icon_label)
 
+        # App name
         title_label = QLabel("QEMU-MCP")
-        title_label.setStyleSheet("color: #e2e8f0; font-size: 14px; font-weight: bold;")
+        title_label.setStyleSheet(
+            "color: " + T.TEXT_PRIMARY + ";"
+            "font-size: " + str(T.FS_LG) + "px; "
+            "font-weight: bold;"
+        )
         title_label.setFixedHeight(24)
         layout.addWidget(title_label)
 
         layout.addStretch()
 
-        # Status indicator
+        # Status indicator (themed)
         self.status_dot = StatusIndicator()
         layout.addWidget(self.status_dot)
 
-        status_text = QLabel("Disconnected")
-        status_text.setStyleSheet("color: #64748b; font-size: 12px;")
-        layout.addWidget(status_text)
+        self._status_text = QLabel("Disconnected")
+        self._status_text.setStyleSheet(
+            "color: " + T.TEXT_MUTED + ";"
+            "font-size: " + str(T.FS_SM) + "px;"
+        )
+        layout.addWidget(self._status_text)
 
         layout.addStretch()
 
         # Window controls
-        self._btn_min = QPushButton("―")
-        self._btn_min.setFixedSize(40, 32)
-        self._btn_min.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #94a3b8;
-                font-size: 16px;
-                border: none;
-            }
-            QPushButton:hover { background: #334155; color: #e2e8f0; }
-        """)
+        self._btn_min = QPushButton("\u2014")
+        self._btn_min.setFixedSize(T.MD * 3, T.LG * 2)
+        self._btn_min.setCursor(Qt.PointingHandCursor)
+        self._btn_min.setStyleSheet(button_ghost_style())
         self._btn_min.clicked.connect(lambda: self._parent.showMinimized())
         layout.addWidget(self._btn_min)
 
-        self._btn_max = QPushButton("□")
-        self._btn_max.setFixedSize(40, 32)
-        self._btn_max.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #94a3b8;
-                font-size: 14px;
-                border: none;
-            }
-            QPushButton:hover { background: #334155; color: #e2e8f0; }
-        """)
+        self._btn_max = QPushButton("\u25A1")
+        self._btn_max.setFixedSize(T.MD * 3, T.LG * 2)
+        self._btn_max.setCursor(Qt.PointingHandCursor)
+        self._btn_max.setStyleSheet(button_ghost_style())
         self._btn_max.clicked.connect(self._toggle_maximize)
         layout.addWidget(self._btn_max)
 
-        self._btn_close = QPushButton("✕")
-        self._btn_close.setFixedSize(40, 32)
-        self._btn_close.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #94a3b8;
-                font-size: 14px;
-                border: none;
-            }
-            QPushButton:hover { background: #ef4444; color: white; }
-        """)
+        self._btn_close = QPushButton("\u2715")
+        self._btn_close.setFixedSize(T.MD * 3, T.LG * 2)
+        self._btn_close.setCursor(Qt.PointingHandCursor)
+        self._btn_close.setStyleSheet(button_red_style())
         self._btn_close.clicked.connect(self._parent.close)
         layout.addWidget(self._btn_close)
 

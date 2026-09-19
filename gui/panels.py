@@ -6,6 +6,7 @@ quick action buttons, recent activity log, and skills summary.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QPixmap, QIcon
 from PyQt5.QtWidgets import (

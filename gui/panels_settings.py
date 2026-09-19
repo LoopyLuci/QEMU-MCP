@@ -7,6 +7,7 @@ Changes are saved to .env and take effect on next server restart.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QWidget,

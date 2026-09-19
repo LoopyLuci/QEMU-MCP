@@ -6,6 +6,7 @@ wired to the QMPBridge for real VM operations.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
@@ -21,7 +22,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
 )
 
-from gui.widgets import Card, StatusIndicator
+from gui.widgets import Card, StatusIndicator, SectionHeader, StatCard
 
 
 class VMControlPanel(QWidget):
@@ -30,7 +31,7 @@ class VMControlPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._qmp_bridge = None
-        self.setStyleSheet("background: #0f172a;")
+        self.setStyleSheet("background: " + T.BG_PRIMARY + ";")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -45,7 +46,7 @@ class VMControlPanel(QWidget):
         conn_row_layout.setContentsMargins(0, 0, 0, 0)
         conn_row_layout.setSpacing(12)
 
-        self.qmp_status = StatusIndicator(QColor("#555555"))
+        self.qmp_status = StatusIndicator(QColor(T.TEXT_MUTED))
         conn_row_layout.addWidget(self.qmp_status, alignment=Qt.AlignVCenter)
 
         self.conn_info = QLabel("Disconnected — QMP not available")
@@ -82,12 +83,12 @@ class VMControlPanel(QWidget):
         btn_row_layout.setSpacing(10)
 
         buttons_spec = [
-            ("Start", "\U0001f7e2", "#22c55e", "Start the virtual machine"),
-            ("Stop", "\u23f9", "#ef4444", "Gracefully stop the VM"),
-            ("Reset", "\U0001f504", "#f59e0b", "Reset the VM (warm reboot)"),
-            ("Suspend", "\u23f8", "#3b82f6", "Suspend the VM to disk"),
-            ("Resume", "\u25b6", "#22c55e", "Resume a suspended VM"),
-            ("Eject ISO", "\U0001f4bf", "#a78bfa", "Eject the boot ISO"),
+            ("Start", "\U0001f7e2", T.SUCCESS, "Start the virtual machine"),
+            ("Stop", "\u23f9", T.ERROR, "Gracefully stop the VM"),
+            ("Reset", "\U0001f504", T.WARNING, "Reset the VM (warm reboot)"),
+            ("Suspend", "\u23f8", T.BRAND, "Suspend the VM to disk"),
+            ("Resume", "\u25b6", T.SUCCESS, "Resume a suspended VM"),
+            ("Eject ISO", "\U0001f4bf", T.INFO, "Eject the boot ISO"),
         ]
 
         self._lifecycle_btns = {}
@@ -340,7 +341,7 @@ class VMControlPanel(QWidget):
 
     def _show_info(self, message: str, success: bool = True):
         """Display an info message."""
-        color = "#22c55e" if success else "#ef4444"
+        color = T.SUCCESS if success else T.ERROR
         self.info_label.setText(message)
         self.info_label.setStyleSheet(f"color: {color}; font-size: 12px;")
 

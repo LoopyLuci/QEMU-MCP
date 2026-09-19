@@ -7,6 +7,7 @@ filesystem.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (

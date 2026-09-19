@@ -6,6 +6,7 @@ Updated every 2 seconds via QTimer.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QWidget,

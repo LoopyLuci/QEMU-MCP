@@ -8,6 +8,7 @@ outside the add/edit dialog.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QIcon, QBrush
 from PyQt5.QtWidgets import (

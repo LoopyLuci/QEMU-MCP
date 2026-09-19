@@ -6,6 +6,7 @@ Filter by level, clear, export to file, and auto-scroll support.
 
 from __future__ import annotations
 
+from gui.theme import T
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QWidget,
