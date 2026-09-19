@@ -163,16 +163,22 @@ class Sidebar(QWidget):
         ("Dashboard", "📊", "dashboard"),
         ("VM Control", "🖥️", "vm_control"),
         ("Guest Terminal", "💻", "guest_terminal"),
+        ("Guest Agent", "🤖", "guest_agent"),
         ("Telemetry", "📈", "telemetry"),
         ("QMP Console", "🔧", "qmp_console"),
         ("Snapshots", "📸", "snapshots"),
         ("Create VM", "➕", "wizard"),
         ("Storage", "💾", "storage"),
+        ("CPU/Memory", "🧠", "cpu"),
+        ("Display", "🖥️", "display"),
+        ("Advanced QEMU", "⚡", "qemu"),
+        ("USB/Devices", "🔌", "usb"),
         ("Network", "🌐", "network"),
         ("Monitoring", "📊", "monitoring"),
         ("Settings", "⚙️", "settings"),
         ("Security", "🔒", "security"),
-        ("Logs", "📋", "logs"),
+        ("Automation", "🤖", "automation"),
+        ("Troubleshoot", "🔍", "troubleshoot"),
     ]
 
     def __init__(self, parent=None):
@@ -370,13 +376,20 @@ class MainWindow(QMainWindow):
         from gui.panels import DashboardPanel
         from gui.panels_vm_control import VMControlPanel
         from gui.panels_guest_terminal import GuestTerminalPanel
+        from gui.panels_guest_agent import GuestAgentPanel
         from gui.panels_telemetry import TelemetryPanel
         from gui.panels_qmp_console import QMPConsolePanel
         from gui.panels_snapshots import SnapshotPanel
         from gui.panels_wizard import VMCreationWizard
         from gui.panels_storage import StoragePanel
+        from gui.panels_usb import USBDevicePanel
         from gui.panels_network import NetworkPanel
         from gui.panels_monitoring import MonitoringPanel
+        from gui.panels_cpu import CPUControlPanel
+        from gui.panels_display import DisplayPanel
+        from gui.panels_qemu import AdvancedQEmuPanel
+        from gui.panels_automation import AutomationPanel
+        from gui.panels_troubleshoot import TroubleshootPanel
         from gui.panels_settings import SettingsPanel
         from gui.panels_security import SecurityPanel
         from gui.panels_logs import LogsPanel
@@ -387,12 +400,19 @@ class MainWindow(QMainWindow):
             (DashboardPanel, "dashboard"),
             (VMControlPanel, "vm_control"),
             (GuestTerminalPanel, "guest_terminal"),
+            (GuestAgentPanel, "guest_agent"),
             (TelemetryPanel, "telemetry"),
             (QMPConsolePanel, "qmp_console"),
             (SnapshotPanel, "snapshots"),
             (VMCreationWizard, "wizard"),
             (StoragePanel, "storage"),
+            (USBDevicePanel, "usb"),
             (NetworkPanel, "network"),
+            (CPUControlPanel, "cpu"),
+            (DisplayPanel, "display"),
+            (AdvancedQEmuPanel, "qemu"),
+            (AutomationPanel, "automation"),
+            (TroubleshootPanel, "troubleshoot"),
             (MonitoringPanel, "monitoring"),
             (SettingsPanel, "settings"),
             (SecurityPanel, "security"),
