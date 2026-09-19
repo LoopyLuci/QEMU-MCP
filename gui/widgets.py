@@ -878,6 +878,7 @@ class ProgressBar(QFrame):
 
 def apply_global_theme():
     """Apply the dark theme to the QApplication palette."""
+    from gui.theme import dark_palette
     app = QApplication.instance()
     if app is None:
         return
@@ -885,4 +886,4 @@ def apply_global_theme():
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("QEMU-MCP")
     app.setStyle("Fusion")
-    app.setPalette(_dp())
+    app.setPalette(dark_palette())

@@ -515,6 +515,7 @@ class MainWindow(QMainWindow):
 def main():
     """Run the QEMU-MCP GUI application."""
     from PyQt5.QtWidgets import QApplication
+    from gui.theme import dark_palette
 
     app = QApplication(sys.argv)
     app.setApplicationName("QEMU-MCP")
@@ -523,19 +524,7 @@ def main():
 
     # Apply global dark theme
     app.setStyle("Fusion")
-    palette = QPalette()
-    palette.setColor(QPalette.Window, QColor("#0f172a"))
-    palette.setColor(QPalette.WindowText, QColor("#e2e8f0"))
-    palette.setColor(QPalette.Base, QColor("#0f172a"))
-    palette.setColor(QPalette.AlternateBase, QColor("#1e293b"))
-    palette.setColor(QPalette.Text, QColor("#e2e8f0"))
-    palette.setColor(QPalette.Button, QColor("#1e293b"))
-    palette.setColor(QPalette.ButtonText, QColor("#e2e8f0"))
-    palette.setColor(QPalette.BrightText, QColor("#ef4444"))
-    palette.setColor(QPalette.Link, QColor("#3b82f6"))
-    palette.setColor(QPalette.Highlight, QColor("#3b82f6"))
-    palette.setColor(QPalette.HighlightedText, QColor("#0f172a"))
-    app.setPalette(palette)
+    app.setPalette(dark_palette())
 
     window = MainWindow()
     window.show()
