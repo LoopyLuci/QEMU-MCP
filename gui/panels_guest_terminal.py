@@ -410,6 +410,8 @@ class GuestTerminalPanel(QWidget):
         self.status_label.setStyleSheet("color: #ef4444; font-size: 12px;")
 
     def _on_command_output(self, output: str):
+        """Handle command output from SSH bridge."""
+        # Output is formatted as "Exit: N\nstdout\nstderr: ..."
         self.terminal.append_output(output)
 
     def _on_file_content(self, content: str):

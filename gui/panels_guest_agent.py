@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
     QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QHeaderView,
     QTabWidget, QGroupBox, QGridLayout, QLineEdit, QSpinBox, QCheckBox,
     QTableWidget, QTableWidgetItem, QSplitter, QFrame, QProgressBar,
-    QSizePolicy, QFileDialog, QInputDialog, QAbstractItemView,
+    QSizePolicy, QFileDialog, QInputDialog, QAbstractItemView, QApplication,
 )
 
 from gui.widgets import Card
@@ -24,6 +24,7 @@ class GuestAgentPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._qmp_bridge = None
+        self._ssh_bridge = None
         self.setStyleSheet("background: " + T.BG_PRIMARY + ";")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -60,6 +61,103 @@ class GuestAgentPanel(QWidget):
     def set_qmp_bridge(self, bridge):
         """Connect to QMP bridge."""
         self._qmp_bridge = bridge
+
+    def set_ssh_bridge(self, bridge):
+        """Connect to SSH bridge for real guest data."""
+        self._ssh_bridge = bridge
+        if bridge:
+            bridge.command_output.connect(self._on_command_output)
+            bridge.file_list.connect(self._on_file_list)
+            bridge.error.connect(self._on_ssh_error)
+            bridge.connected.connect(self._on_ssh_connected)
+            # Fetch real data when connected
+            self._refresh_all()
+
+    def _refresh_all(self):
+        """Refresh all guest data via SSH."""
+        if not self._ssh_bridge:
+            return
+        # Fetch processes
+        self._ssh_bridge.run_command("ps aux --no-headers | head -20")
+        # Fetch services
+        self._ssh_bridge.run_command("systemctl list-units --type=service --state=running --no-pager | head -10")
+        # Fetch network
+        self._ssh_bridge.run_command("ip addr show")
+        # Fetch files
+        self._ssh_bridge.list_dir("/home/omarchyvm")
+
+    def _on_ssh_connected(self, connected: bool):
+        """Handle SSH connection."""
+        if connected:
+            self._agent_status.setText("Agent: Connected (SSH)")
+            self._agent_status.setStyleSheet("color: " + T.STATUS_RUNNING + "; font-size: 12px;")
+        else:
+            self._agent_status.setText("Agent: Disconnected")
+            self._agent_status.setStyleSheet("color: " + T.STATUS_STOPPED + "; font-size: 12px;")
+
+    def _on_command_output(self, output: str):
+        """Handle command output from SSH."""
+        # Parse process list or service list based on content
+        if "ps aux" in output or "PID" in output:
+            self._parse_processes(output)
+        elif "systemctl" in output or "LOAD" in output:
+            self._parse_services(output)
+        elif "ip addr" in output or "inet " in output:
+            self._parse_network(output)
+
+    def _on_file_list(self, files: list):
+        """Handle file list from SSH."""
+        self._populate_file_tree(files)
+
+    def _on_ssh_error(self, message: str):
+        """Handle SSH error."""
+        self._agent_status.setText("Agent: Error")
+        self._agent_status.setStyleSheet("color: " + T.ERROR + "; font-size: 12px;")
+
+    def _parse_processes(self, output: str):
+        """Parse ps aux output into process table."""
+        lines = output.strip().split("\n")[1:]  # Skip header
+        self._proc_table.setRowCount(0)
+        for i, line in enumerate(lines[:50]):  # Limit to 50 processes
+            parts = line.split(None, 10)
+            if len(parts) >= 11:
+                row = self._proc_table.rowCount()
+                self._proc_table.insertRow(row)
+                self._proc_table.setItem(row, 0, QTableWidgetItem(parts[1]))  # PID
+                self._proc_table.setItem(row, 1, QTableWidgetItem(parts[10]))  # Command
+                self._proc_table.setItem(row, 2, QTableWidgetItem(parts[2]))  # CPU%
+                self._proc_table.setItem(row, 3, QTableWidgetItem(parts[3]))  # MEM%
+                self._proc_table.setItem(row, 4, QTableWidgetItem("Running"))
+
+    def _parse_services(self, output: str):
+        """Parse systemctl output into services table."""
+        lines = output.strip().split("\n")[1:]  # Skip header
+        self._svc_table.setRowCount(0)
+        for i, line in enumerate(lines[:20]):  # Limit to 20 services
+            parts = line.split(None, 4)
+            if len(parts) >= 4:
+                row = self._svc_table.rowCount()
+                self._svc_table.insertRow(row)
+                self._svc_table.setItem(row, 0, QTableWidgetItem(parts[0]))  # Unit
+                self._svc_table.setItem(row, 1, QTableWidgetItem(parts[3]))  # Sub
+                self._svc_table.setItem(row, 2, QTableWidgetItem("Yes" if parts[3] == "running" else "No"))
+                self._svc_table.setItem(row, 3, QTableWidgetItem(parts[4] if len(parts) > 4 else ""))
+
+    def _populate_file_tree(self, files: list):
+        """Populate file tree from SSH directory listing."""
+        self._file_tree.clear()
+        for f in files:
+            path = f.get("path", f.get("name", ""))
+            name = f.get("name", path.split("/")[-1])
+            size = f.get("size", "")
+            mtime = f.get("mtime", "")
+            is_dir = f.get("type") == "dir"
+            item = QTreeWidgetItem(self._file_tree, [name, str(size), mtime, "Directory" if is_dir else "File"])
+            item.setData(0, Qt.UserRole, path)
+
+    def _parse_network(self, output: str):
+        """Parse ip addr output into network info."""
+        self._net_info.setText(output)
 
     def _guest_info_tab(self) -> QWidget:
         """Guest information dashboard."""

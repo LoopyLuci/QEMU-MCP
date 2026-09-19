@@ -90,6 +90,10 @@ class SSHBridge(QObject):
 
     async def _connect_impl(self):
         try:
+            # Check if already connected
+            if self._connected:
+                self.connected.emit(True)
+                return
             await ssh_mod._connect(self._secrets, self._settings)
             self._connected = True
             self._ever_connected = True

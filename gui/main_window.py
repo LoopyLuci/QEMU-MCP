@@ -440,6 +440,9 @@ class MainWindow(QMainWindow):
             self.panels["vm_control"].set_qmp_bridge(self.qmp_bridge)
         if "guest_terminal" in self.panels:
             self.panels["guest_terminal"].set_ssh_bridge(self.ssh_bridge)
+        if "guest_agent" in self.panels:
+            self.panels["guest_agent"].set_qmp_bridge(self.qmp_bridge)
+            self.panels["guest_agent"].set_ssh_bridge(self.ssh_bridge)
         if "telemetry" in self.panels:
             self.panels["telemetry"].set_qmp_bridge(self.qmp_bridge)
             self.panels["telemetry"].set_ssh_bridge(self.ssh_bridge)
