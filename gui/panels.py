@@ -167,13 +167,15 @@ class DashboardPanel(QWidget):
         """Update dashboard with live VM status."""
         if not status:
             return
-        if "status" in status:
+        if "return" in status:
+            status = status["return"]
+        if "status" in status and isinstance(status["status"], dict):
             status = status["status"]
         running = status.get("running", False) if isinstance(status, dict) else False
         self._vm_running = running
         self.status_dot.set_status(running)
 
-        state_text = "Running" if running else "Paused" if status.get("status") == "paused" else "Stopped"
+        state_text = "Running" if running else "Paused" if (isinstance(status, dict) and status.get("status") == "paused") else "Stopped"
         self._state_label.setText(state_text)
         self._state_label.setStyleSheet(
             "color: " + (T.STATUS_RUNNING if running else T.STATUS_PAUSED) + ";"
@@ -188,6 +190,24 @@ class DashboardPanel(QWidget):
             self.start_btn.setEnabled(True)
             self.stop_btn.setEnabled(False)
             self.reset_btn.setEnabled(False)
+
+        # Try to get PID from QEMU process
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq qemu-system-x86_64.exe", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0 and "qemu-system-x86_64.exe" in result.stdout:
+                lines = [l.strip() for l in result.stdout.strip().split("\n") if l.strip()]
+                if lines:
+                    parts = lines[0].split(",")
+                    if len(parts) >= 2:
+                        pid = parts[1].strip('"')
+                        self._vm_pid = pid
+                        self._stat_labels["PID"].setText(pid)
+        except Exception:
+            pass
 
     def _on_connected(self, connected: bool):
         """Handle QMP connect/disconnect."""

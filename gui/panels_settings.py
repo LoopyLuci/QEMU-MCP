@@ -609,23 +609,64 @@ class SettingsPanel(QWidget):
         os.environ.pop("VM_MCP_ENV_FILE", None)
 
     def _save_settings(self):
-        """Save all settings to .env and config."""
+        """Save all settings to .env with validation and feedback."""
         from pathlib import Path
-        from vm_mcp.config import VmMCPSettings
+        from PyQt5.QtWidgets import QMessageBox
 
         env_path = Path(".env")
+
+        # ── Validate ───────────────────────────────────────────────────────────
+        errors = []
+
+        # Check QEMU binary exists
+        qemu_bin = self.qemu_bin_input.text().strip()
+        if not Path(qemu_bin).is_file():
+            errors.append(f"QEMU binary not found: {qemu_bin}")
+
+        # Check disk exists
+        disk = self.disk_input.text().strip()
+        if not Path(disk).is_file():
+            errors.append(f"VM disk not found: {disk}")
+
+        # Validate SSH port
+        ssh_port = self.ssh_port_spin.value()
+        if ssh_port < 1 or ssh_port > 65535:
+            errors.append(f"Invalid SSH port: {ssh_port} (must be 1-65535)")
+
+        # Validate RAM
+        ram = self.ram_spin.value()
+        if ram < 256:
+            errors.append(f"RAM too low: {ram}MB (minimum 256MB)")
+        if ram > 131072:
+            errors.append(f"RAM too high: {ram}MB (maximum 131072MB)")
+
+        # Validate CPUs
+        cpus = self.cpu_spin.value()
+        if cpus < 1:
+            errors.append(f"CPUs too low: {cpus} (minimum 1)")
+        if cpus > 128:
+            errors.append(f"CPUs too high: {cpus} (maximum 128)")
+
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Validation Errors",
+                "Please fix the following errors:\n\n" + "\n".join(f"• {e}" for e in errors),
+            )
+            return
+
         settings = {}
 
         # QEMU
-        settings["QEMU_BINARY"] = self.qemu_bin_input.text()
+        settings["QEMU_BINARY"] = qemu_bin
         settings["QEMU_EXTRA_ARGS"] = self.qemu_args_input.text()
 
         # VM
         settings["VM_NAME"] = self.vm_name_input.text()
-        settings["VM_DISK"] = self.disk_input.text()
+        settings["VM_DISK"] = disk
         settings["VM_ISO"] = self.iso_input.text()
-        settings["VM_RAM_MB"] = str(self.ram_spin.value())
-        settings["VM_CPUS"] = str(self.cpu_spin.value())
+        settings["VM_RAM_MB"] = str(ram)
+        settings["VM_CPUS"] = str(cpus)
         settings["VM_HOSTNAME"] = self.hostname_input.text()
 
         # Display
@@ -635,7 +676,7 @@ class SettingsPanel(QWidget):
 
         # Network
         settings["SSH_HOST"] = self.ssh_host_input.text()
-        settings["SSH_PORT"] = str(self.ssh_port_spin.value())
+        settings["SSH_PORT"] = str(ssh_port)
         settings["SSH_USERNAME"] = self.guest_user_input.text()
 
         # Logging
