@@ -282,7 +282,27 @@ def main():
         run_with_guardian(args)
     else:
         app = SelfHealingApp(args)
-        sys.exit(app.run())
+        
+        # Handle signals for clean shutdown
+        def signal_handler(signum, frame):
+            logger.info("Received signal %d, shutting down", signum)
+            app._cleanup()
+            sys.exit(0)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        try:
+            exit_code = app.run()
+        except KeyboardInterrupt:
+            app._cleanup()
+            exit_code = 0
+        except Exception as e:
+            logger.error("GUI crashed: %s", e)
+            app._cleanup()
+            exit_code = 1
+        
+        sys.exit(exit_code)
 
 
 def headless_main():
