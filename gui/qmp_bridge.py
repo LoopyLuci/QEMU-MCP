@@ -1,16 +1,13 @@
-"""QMP bridge — background thread async→PyQt5 signal wrapper.
-
-Uses vm_mcp.qmp_client QMPClient + module-level helpers.
-Runs all QMP operations on a background QThread with asyncio.
-"""
+"""QMP bridge — async QMP client → PyQt5 signals, via threading.Thread."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import Any
 
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 
 from vm_mcp.config import VmMCPSettings, Secrets
 from vm_mcp.qmp_client import QMPClient
@@ -19,29 +16,40 @@ from vm_mcp import qmp_client as qmp_mod
 logger = logging.getLogger("qmcmcp.qmp_bridge")
 
 
+# ── QMPBridge ─────────────────────────────────────────────────────────────────
+
+
 class QMPBridge(QObject):
     """Wraps QMPClient for PyQt5 GUI usage.
 
-    All operations are scheduled on a background thread's asyncio event
-    loop via asyncio.run_coroutine_threadsafe().  Results come back via
-    PyQt5 signals so the GUI stays responsive.
+    Uses ``threading.Thread`` (NOT QThread) so ``_run_loop()`` executes
+    synchronously inside the worker thread.  ``_loop`` is guaranteed to be
+    set before ``start()`` returns — no Qt ``started``-signal race.
     """
 
+    # ── Signals ──────────────────────────────────────────────────────────────
     connected = pyqtSignal(bool)
     vm_status = pyqtSignal(dict)
     error = pyqtSignal(str)
     command_result = pyqtSignal(dict)
 
+    # ── Constructor ──────────────────────────────────────────────────────────
+
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self._settings = settings
         from vm_mcp.config import Secrets
+
         self._secrets = Secrets.from_env()
         self._qmp_uri = self._build_uri()
         self._connected = False
-        self._thread: QThread | None = None
+        self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._client: QMPClient | None = None
+        self._ever_connected = False
+        self._loop_ready = threading.Event()
+
+    # ── URI helpers ──────────────────────────────────────────────────────────
 
     def _build_uri(self) -> str:
         """Build QMP connection URI from settings."""
@@ -49,49 +57,69 @@ class QMPBridge(QObject):
             return f"unix:{self._settings.qmp_socket_path}"
         return f"tcp:{self._settings.qmp_host}:{self._settings.qmp_port}"
 
+    def _rebuild_uri(self) -> str:
+        """Re-read settings and build URI (call when settings may have changed)."""
+        self._qmp_uri = self._build_uri()
+        return self._qmp_uri
+
+    # ── Thread lifecycle ─────────────────────────────────────────────────────
+
     def start(self):
-        """Start the background thread and asyncio event loop."""
-        if self._thread and self._thread.isRunning():
+        """Start the background thread + asyncio loop.
+
+        ``threading.Thread`` guarantees ``_run_loop()`` runs synchronously
+        inside the thread — ``_loop`` is always set before this returns.
+        """
+        if self._thread is not None and self._thread.is_alive():
             return
-        self._thread = QThread()
-        self.moveToThread(self._thread)
-        self._thread.started.connect(self._run_loop)
+        self._loop_ready.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
+        # Wait for the event loop to be created (up to 5s)
+        if not self._loop_ready.wait(timeout=5.0):
+            raise RuntimeError("QMP bridge event loop failed to start within 5s")
 
     def stop(self):
         """Stop the event loop and thread."""
-        if self._loop and self._loop.is_running():
+        if self._loop is not None and self._loop.is_running():
             self._loop.call_soon_threadsafe(self._loop.stop)
-        if self._thread and self._thread.isRunning():
-            self._thread.quit()
-            self._thread.wait(3000)
-        if self._client:
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+        if self._client is not None:
             try:
-                asyncio.run(self._client.disconnect())
+                threading.Thread(
+                    target=lambda: asyncio.run(self._client.disconnect()),
+                    daemon=True,
+                ).start()
             except Exception:
                 pass
         self._connected = False
 
     def _run_loop(self):
-        """Run the asyncio event loop on the thread."""
+        """Run the asyncio event loop — executes inside the worker thread."""
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
+        self._loop_ready.set()
         self._loop.run_forever()
+
+    # ── Connection state ─────────────────────────────────────────────────────
 
     @property
     def is_connected(self) -> bool:
         return self._connected
 
-    # ── Internal: client management (async, runs on bg thread) ─────────────
+    # ── Internal: client management (async, runs on bg thread) ──────────────
 
     async def _get_client(self) -> QMPClient:
         """Get or create the QMP client, connecting if needed."""
         if self._client is None or not self._client.is_connected:
             self._client = QMPClient(
-                uri=self._build_uri(), password=self._secrets.get_qmp_password()
+                uri=self._build_uri(),
+                password=self._secrets.get_qmp_password(),
             )
             await self._client.connect()
             self._connected = True
+            self._ever_connected = True
             self.connected.emit(True)
         return self._client
 
@@ -121,7 +149,7 @@ class QMPBridge(QObject):
 
     async def _disconnect_impl(self):
         try:
-            if self._client:
+            if self._client is not None:
                 await self._client.disconnect()
             self._client = None
             self._connected = False
@@ -194,7 +222,7 @@ class QMPBridge(QObject):
             logger.error("QMP cont failed: %s", e)
             self.error.emit(f"Resume failed: {e}")
 
-    def stop(self):
+    def stop_vm(self):
         """Stop the VM (suspend CPU)."""
         if self._loop is None:
             self.error.emit("QMP bridge not started")
@@ -227,7 +255,10 @@ class QMPBridge(QObject):
             self.error.emit(f"Eject failed: {e}")
 
 
-def create_qmp_bridge(settings) -> QMPBridge:
+# ── Factory ───────────────────────────────────────────────────────────────────
+
+
+def create_qmp_bridge(settings: VmMCPSettings) -> QMPBridge:
     """Create and start a QMP bridge."""
     bridge = QMPBridge(settings=settings)
     bridge.start()

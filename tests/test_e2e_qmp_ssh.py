@@ -20,9 +20,9 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 
 def _qmp_port_open() -> bool:
-    """Check if QMP port 4445 is reachable."""
+    """Check if QMP port 4444 is reachable (live QEMU instance)."""
     try:
-        s = socket.create_connection(("127.0.0.1", 4445), timeout=2)
+        s = socket.create_connection(("127.0.0.1", 4444), timeout=2)
         s.close()
         return True
     except (OSError, ConnectionRefusedError):
@@ -34,8 +34,6 @@ def settings():
     from vm_mcp.config import VmMCPSettings, Secrets
 
     s = VmMCPSettings()
-    # Override QMP port to match running QEMU instance
-    s.qmp_port = 4445
     return s
 
 

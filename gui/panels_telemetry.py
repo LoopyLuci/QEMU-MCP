@@ -151,6 +151,7 @@ class TelemetryPanel(QWidget):
         self._data_timer = QTimer(self)
         self._data_timer.timeout.connect(self._refresh_charts)
         self._data_timer.start(2000)
+        self._qmp_pid = None
 
         # Seed initial data
         self._seed_initial_data()
@@ -189,8 +190,20 @@ class TelemetryPanel(QWidget):
         vm_ram = 0.0
 
         if self._qmp_bridge and self._qmp_bridge.is_connected:
-            # Real VM data would come from QMP queries
-            pass
+            try:
+                status = self._qmp_bridge.get_status()
+                if status and "pid" in status:
+                    pid = status["pid"]
+                    if pid and pid != "—":
+                        try:
+                            proc = psutil.Process(int(pid))
+                            vm_cpu = proc.cpu_percent(interval=0)
+                            if vm_cpu == 0.0:
+                                vm_cpu = proc.cpu_percent(interval=0.5)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+            except Exception:
+                pass
 
         if vm_cpu == 0.0:
             # Fallback: random walk around low CPU
