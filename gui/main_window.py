@@ -161,10 +161,12 @@ class Sidebar(QWidget):
 
     PANELS = [
         ("Dashboard", "📊", "dashboard"),
+        ("VM Switcher", "🔄", "vm_switcher"),
         ("VM Control", "🖥️", "vm_control"),
         ("Guest Terminal", "💻", "guest_terminal"),
         ("Guest Agent", "🤖", "guest_agent"),
         ("Telemetry", "📈", "telemetry"),
+        ("QMP System Info", "📋", "sysinfo"),
         ("QMP Console", "🔧", "qmp_console"),
         ("Snapshots", "📸", "snapshots"),
         ("Create VM", "➕", "wizard"),
@@ -373,12 +375,14 @@ class MainWindow(QMainWindow):
 
     def _build_panels(self):
         """Create all panels and add them to the stacked widget."""
+        from gui.panels_vm_switcher import VMSwitcherPanel
         from gui.panels import DashboardPanel
         from gui.panels_vm_control import VMControlPanel
         from gui.panels_guest_terminal import GuestTerminalPanel
         from gui.panels_guest_agent import GuestAgentPanel
         from gui.panels_telemetry import TelemetryPanel
         from gui.panels_qmp_console import QMPConsolePanel
+        from gui.panels_sysinfo import QemuSystemInfoPanel
         from gui.panels_snapshots import SnapshotPanel
         from gui.panels_wizard import VMCreationWizard
         from gui.panels_storage import StoragePanel
@@ -398,11 +402,13 @@ class MainWindow(QMainWindow):
 
         panel_list = [
             (DashboardPanel, "dashboard"),
+            (VMSwitcherPanel, "vm_switcher"),
             (VMControlPanel, "vm_control"),
             (GuestTerminalPanel, "guest_terminal"),
             (GuestAgentPanel, "guest_agent"),
             (TelemetryPanel, "telemetry"),
             (QMPConsolePanel, "qmp_console"),
+            (QemuSystemInfoPanel, "sysinfo"),
             (SnapshotPanel, "snapshots"),
             (VMCreationWizard, "wizard"),
             (StoragePanel, "storage"),

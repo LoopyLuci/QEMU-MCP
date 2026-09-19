@@ -316,7 +316,7 @@ class TestMainWindow:
         assert win is not None
         assert win.width() == 1400
         assert win.height() == 900
-        assert len(win.panels) == 20
+        assert len(win.panels) == 22
         assert win.qmp_bridge is not None
         assert win.ssh_bridge is not None
         qtbot.addWidget(win)
