@@ -73,7 +73,7 @@ def build_qemu_args(
         # CPU model — generic to maximize compatibility
         "-cpu", "host",
         # BIOS/UEFI — OVMF (QEMU bundles OVMF or user provides it)
-        "-drive", "if=pflash,format=raw,readonly=on,file=OVMF.fd",
+        "-drive", "if=pflash,format=raw,readonly=on,file=C:/Program Files/qemu/share/edk2-x86_64-code.fd",
         # NIC — virtio-net-pci with user-mode networking
         "-netdev", "user,id=net0,hostfwd=tcp::2222-:22",
         "-device", "virtio-net-pci,netdev=net0",
@@ -147,9 +147,10 @@ class QMPClient:
             path = self.uri[6:]
             self._reader, self._writer = await asyncio.open_unix_connection(path)
         else:
-            _, writer = await asyncio.open_connection(self.uri.split(":")[0], int(self.uri.split(":")[1]))
-            self._writer = writer
-            self._reader = writer.get_extra_info("socket").makefile("r")
+            parts = self.uri.split(":")
+            host = parts[1]
+            port = int(parts[2])
+            self._reader, self._writer = await asyncio.open_connection(host, port)
 
         self._connected = True
 

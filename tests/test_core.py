@@ -170,6 +170,7 @@ class TestSSHClientUnit:
         from vm_mcp.config import VmMCPSettings
 
         settings = VmMCPSettings()
+        settings.vm_iso_path = r"C:\test\omarchy.iso"
         args = build_qemu_args(settings, start_iso=True)
         assert "-drive" in args
         assert "cdrom" in " ".join(args)

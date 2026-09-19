@@ -58,8 +58,8 @@ class VmMCPSettings(BaseSettings):
         description="Path to VM disk image",
     )
     vm_iso_path: str | None = Field(
-        default=r"C:\Projects\Omarchy\vm-setup\omarchy-4.0.4.iso",
-        description="Path to Omarchy ISO",
+        default=None,
+        description="Path to Omarchy ISO (optional — VM disk has OS installed)",
     )
     vm_ram_mb: int = Field(default=8192, description="VM RAM in MB", ge=512, le=131072)
     vm_cpus: int = Field(default=4, description="Number of vCPUs", ge=1, le=128)
