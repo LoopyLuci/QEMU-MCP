@@ -37,6 +37,7 @@ class SSHBridge(QObject):
         self._settings = settings
         self._secrets = Secrets.from_env()
         self._connected = False
+        self._connecting = False  # Prevent concurrent connect attempts
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._ever_connected = False
@@ -82,6 +83,10 @@ class SSHBridge(QObject):
         if self._loop is None or not self._loop.is_running():
             self.error.emit("SSH bridge not started")
             return
+        # Don't fire multiple concurrent connect attempts
+        if self._connecting:
+            return
+        self._connecting = True
         asyncio.run_coroutine_threadsafe(self._connect_impl(), self._loop)
 
     def connect(self):
@@ -90,10 +95,6 @@ class SSHBridge(QObject):
 
     async def _connect_impl(self):
         try:
-            # Check if already connected
-            if self._connected:
-                self.connected.emit(True)
-                return
             await ssh_mod._connect(self._secrets, self._settings)
             self._connected = True
             self._ever_connected = True
@@ -107,6 +108,8 @@ class SSHBridge(QObject):
             self._connected = False
             self.connected.emit(False)
             self.error.emit(f"SSH connection failed: {e}")
+        finally:
+            self._connecting = False
 
     def disconnect_ssh(self):
         """Disconnect from the guest SSH server."""
