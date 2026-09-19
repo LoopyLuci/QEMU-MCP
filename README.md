@@ -57,7 +57,7 @@ GUI credentials are stored encrypted in `~/.local/share/qmcmcp/credentials.json`
 
 ### QMP/SSH bridging
 
-The GUI runs QMP and SSH operations on background `QThread` + `asyncio` event loops.  `QMPBridge` and `SSHBridge` objects in `gui/qmp_bridge.py` and `gui/ssh_bridge.py` emit PyQt5 signals on completion, keeping the UI responsive.
+The GUI runs QMP and SSH operations on background ``threading.Thread`` + ``asyncio`` event loops.  ``QMPBridge`` and ``SSHBridge`` objects in ``gui/qmp_bridge.py`` and ``gui/ssh_bridge.py`` emit PyQt5 signals on completion, keeping the UI responsive.
 
 ## Architecture
 
@@ -233,8 +233,8 @@ vm-mcp/
 │   ├── __init__.py             # GUI package exports
 │   ├── __main__.py             # python -m vm_mcp.gui entry
 │   ├── main_window.py          # Frameless MainWindow, TitleBar, Sidebar
-│   ├── qmp_bridge.py           # Async→PyQt5 QMP bridge (QThread+asyncio)
-│   ├── ssh_bridge.py           # Async→PyQt5 SSH bridge (QThread+asyncio)
+│   ├── qmp_bridge.py           # Async→PyQt5 QMP bridge (threading.Thread+asyncio)
+│   ├── ssh_bridge.py           # Async→PyQt5 SSH bridge (threading.Thread+asyncio)
 │   ├── credential_store.py     # Fernet-encrypted credential storage
 │   ├── widgets.py              # Reusable UI components (10 widgets)
 │   ├── panels.py               # DashboardPanel
