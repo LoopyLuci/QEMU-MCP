@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 )
 
 from gui.widgets import Card, StatusIndicator
+from gui.qmp_extractor import QMPExtractor
 
 
 class DashboardPanel(QWidget):
