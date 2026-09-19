@@ -161,6 +161,8 @@ class Sidebar(QWidget):
         ("VM Control", "🖥️", "vm_control"),
         ("Guest Terminal", "💻", "guest_terminal"),
         ("Telemetry", "📈", "telemetry"),
+        ("QMP Console", "🔧", "qmp_console"),
+        ("Snapshots", "📸", "snapshots"),
         ("Settings", "⚙️", "settings"),
         ("Security", "🔒", "security"),
         ("Logs", "📋", "logs"),
@@ -362,27 +364,43 @@ class MainWindow(QMainWindow):
         from gui.panels_vm_control import VMControlPanel
         from gui.panels_guest_terminal import GuestTerminalPanel
         from gui.panels_telemetry import TelemetryPanel
+        from gui.panels_qmp_console import QMPConsolePanel
+        from gui.panels_snapshots import SnapshotPanel
         from gui.panels_settings import SettingsPanel
         from gui.panels_security import SecurityPanel
         from gui.panels_logs import LogsPanel
 
         self.panels: dict[str, QWidget] = {}
-        for panel_cls in [DashboardPanel, VMControlPanel, GuestTerminalPanel, TelemetryPanel, SettingsPanel, SecurityPanel, LogsPanel]:
+
+        panel_list = [
+            (DashboardPanel, "dashboard"),
+            (VMControlPanel, "vm_control"),
+            (GuestTerminalPanel, "guest_terminal"),
+            (TelemetryPanel, "telemetry"),
+            (QMPConsolePanel, "qmp_console"),
+            (SnapshotPanel, "snapshots"),
+            (SettingsPanel, "settings"),
+            (SecurityPanel, "security"),
+            (LogsPanel, "logs"),
+        ]
+
+        for panel_cls, name in panel_list:
             panel = panel_cls(self)
-            name = panel.__class__.__name__.replace("Panel", "").lower()
             self.panels[name] = panel
             self.panel_stack.addWidget(panel)
 
         # ── Wire bridges to panels ────────────────────────────────────────────
         if "dashboard" in self.panels:
             self.panels["dashboard"].set_qmp_bridge(self.qmp_bridge)
-        if "vmcontrol" in self.panels:
-            self.panels["vmcontrol"].set_qmp_bridge(self.qmp_bridge)
-        if "guestterminal" in self.panels:
-            self.panels["guestterminal"].set_ssh_bridge(self.ssh_bridge)
+        if "vm_control" in self.panels:
+            self.panels["vm_control"].set_qmp_bridge(self.qmp_bridge)
+        if "guest_terminal" in self.panels:
+            self.panels["guest_terminal"].set_ssh_bridge(self.ssh_bridge)
         if "telemetry" in self.panels:
             self.panels["telemetry"].set_qmp_bridge(self.qmp_bridge)
             self.panels["telemetry"].set_ssh_bridge(self.ssh_bridge)
+        if "qmp_console" in self.panels:
+            self.panels["qmp_console"].set_qmp_bridge(self.qmp_bridge)
 
         self._switch_panel("dashboard")
 

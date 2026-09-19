@@ -1,30 +1,20 @@
 """Dashboard panel — VM status overview and quick actions.
 
 Shows a comprehensive status card with VM state, resource usage,
-quick action buttons, recent activity log, and skills summary.
+quick action buttons, and recent activity log.
 """
 
 from __future__ import annotations
 
 from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QPixmap, QIcon
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QFrame,
-    QListWidget,
-    QListWidgetItem,
-    QProgressBar,
-    QGroupBox,
-    QSpacerItem,
-    QSizePolicy,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QFrame, QListWidget, QListWidgetItem,
 )
 
-from gui.widgets import Card, StatusIndicator, IconButton
+from gui.widgets import Card, StatusIndicator
 
 
 class DashboardPanel(QWidget):
@@ -41,41 +31,41 @@ class DashboardPanel(QWidget):
         self._vm_disk_used = "—"
         self._vm_disk_total = "—"
         self._vm_uptime = "0:00:00"
-        self.setStyleSheet("background: #0f172a;")
+        self.setStyleSheet("background: " + T.BG_PRIMARY + ";")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
         # ── VM Status Card ─────────────────────────────────────────────────────
         status_card = Card("Virtual Machine Status", self)
-        status_card.setFixedHeight(200)
+        status_card.setFixedHeight(180)
         layout.addWidget(status_card)
 
-        # Status indicator + state
         status_row = QWidget()
         status_row_layout = QHBoxLayout(status_row)
         status_row_layout.setContentsMargins(0, 0, 0, 0)
         status_row_layout.setSpacing(12)
 
-        self.status_dot = StatusIndicator(QColor("#555555"))
+        self.status_dot = StatusIndicator()
+        self.status_dot.set_status(False)
         status_row_layout.addWidget(self.status_dot, alignment=Qt.AlignVCenter)
 
         state_layout = QVBoxLayout()
         state_layout.setSpacing(2)
         state_label = QLabel("Stopped")
-        state_label.setStyleSheet("color: #94a3b8; font-size: 14px; font-weight: 600;")
+        state_label.setStyleSheet("color: " + T.TEXT_SECONDARY + "; font-size: 14px; font-weight: 600;")
         state_label.setFixedHeight(20)
         state_layout.addWidget(state_label)
+        self._state_label = state_label
 
         vm_name_label = QLabel("omarchy-vm")
-        vm_name_label.setStyleSheet("color: #64748b; font-size: 12px;")
+        vm_name_label.setStyleSheet("color: " + T.TEXT_MUTED + "; font-size: 12px;")
         state_layout.addWidget(vm_name_label)
         state_layout.addStretch()
 
-        status_row_layout.addWidget(status_row, alignment=Qt.AlignVCenter)
+        status_row_layout.addLayout(state_layout)
         status_row_layout.addStretch()
 
-        # Quick stats row
         stats_row = QWidget()
         stats_row_layout = QHBoxLayout(stats_row)
         stats_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -83,29 +73,29 @@ class DashboardPanel(QWidget):
 
         self._stat_labels: dict[str, QLabel] = {}
 
-        for label, value, color in [
-            ("PID", "—", "#64748b"),
-            ("RAM", "8.0 GB", "#38bdf8"),
-            ("vCPUs", "4", "#a78bfa"),
-            ("Disk", "6.6 GB / 64 GB", "#22c55e"),
-            ("Uptime", "0:00:00", "#f59e0b"),
+        for label_text, value, color in [
+            ("PID", "—", T.TEXT_MUTED),
+            ("RAM", "8.0 GB", T.CHART_CPU),
+            ("vCPUs", "4", T.TEXT_ACCENT),
+            ("Disk", "6.2 GB", T.STATUS_RUNNING),
+            ("Uptime", "0:00:00", T.STATUS_PAUSED),
         ]:
             stat = QWidget()
             sl = QHBoxLayout(stat)
             sl.setContentsMargins(0, 0, 0, 0)
             sl.setSpacing(4)
-            sl_label = QLabel(label)
-            sl_label.setStyleSheet("color: #64748b; font-size: 11px;")
-            sl_value = QLabel(value)
-            sl_value.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: 600;")
-            sl.addWidget(sl_label)
-            sl.addWidget(sl_value)
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("color: " + T.TEXT_MUTED + "; font-size: 11px;")
+            val = QLabel(value)
+            val.setStyleSheet("color: " + color + "; font-size: 13px; font-weight: 600;")
+            sl.addWidget(lbl)
+            sl.addWidget(val)
             stats_row_layout.addWidget(stat)
-            self._stat_labels[label] = sl_value
+            self._stat_labels[label_text] = val
 
         stats_row_layout.addStretch()
-        status_card.content_layout.addWidget(status_row)
-        status_card.content_layout.addWidget(stats_row)
+        status_card.add_widget(status_row)
+        status_card.add_widget(stats_row)
         status_card.content_layout.addStretch()
 
         # ── Quick Actions ──────────────────────────────────────────────────────
@@ -117,112 +107,96 @@ class DashboardPanel(QWidget):
         actions_row_layout.setContentsMargins(0, 0, 0, 0)
         actions_row_layout.setSpacing(12)
 
-        # Start VM
-        start_btn = IconButton(text="Start VM")
-        start_btn.setFixedSize(180, 48)
-        start_btn.setStyleSheet("""
-            IconButton {
-                background: #22c55e;
-                border: none;
-                border-radius: 8px;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-                padding: 0 16px;
-            }
-            IconButton:hover { background: #16a34a; }
-            IconButton:disabled { background: #22c55e20; color: #64748b; }
-        """)
-        actions_row_layout.addWidget(start_btn)
+        self.start_btn = QPushButton("▶  Start VM")
+        self.start_btn.setFixedSize(140, 40)
+        self.start_btn.setStyleSheet(
+            "QPushButton { background: " + T.STATUS_RUNNING + "; border: none; border-radius: 8px;"
+            " color: white; font-size: 13px; font-weight: 600; }"
+            "QPushButton:hover { background: #16a34a; }"
+            "QPushButton:disabled { background: #22c55e20; color: " + T.TEXT_MUTED + "; }"
+        )
+        actions_row_layout.addWidget(self.start_btn)
 
-        # Stop VM
-        stop_btn = IconButton(text="Stop VM")
-        stop_btn.setFixedSize(180, 48)
-        stop_btn.setStyleSheet("""
-            IconButton {
-                background: #ef4444;
-                border: none;
-                border-radius: 8px;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-                padding: 0 16px;
-            }
-            IconButton:hover { background: #dc2626; }
-            IconButton:disabled { background: #ef444420; color: #64748b; }
-        """)
-        actions_row_layout.addWidget(stop_btn)
+        self.stop_btn = QPushButton("■  Stop VM")
+        self.stop_btn.setFixedSize(140, 40)
+        self.stop_btn.setStyleSheet(
+            "QPushButton { background: " + T.STATUS_STOPPED + "; border: none; border-radius: 8px;"
+            " color: white; font-size: 13px; font-weight: 600; }"
+            "QPushButton:hover { background: #dc2626; }"
+            "QPushButton:disabled { background: #ef444420; color: " + T.TEXT_MUTED + "; }"
+        )
+        actions_row_layout.addWidget(self.stop_btn)
 
-        # Reset VM
-        reset_btn = IconButton(text="Reset VM")
-        reset_btn.setFixedSize(180, 48)
-        reset_btn.setStyleSheet("""
-            IconButton {
-                background: #f59e0b;
-                border: none;
-                border-radius: 8px;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-                padding: 0 16px;
-            }
-            IconButton:hover { background: #d97706; }
-            IconButton:disabled { background: #f59e0b20; color: #64748b; }
-        """)
-        actions_row_layout.addWidget(reset_btn)
-
+        self.reset_btn = QPushButton("↻  Reset VM")
+        self.reset_btn.setFixedSize(140, 40)
+        self.reset_btn.setStyleSheet(
+            "QPushButton { background: " + T.STATUS_PAUSED + "; border: none; border-radius: 8px;"
+            " color: white; font-size: 13px; font-weight: 600; }"
+            "QPushButton:hover { background: #d97706; }"
+            "QPushButton:disabled { background: #f59e0b20; color: " + T.TEXT_MUTED + "; }"
+        )
+        actions_row_layout.addWidget(self.reset_btn)
         actions_row_layout.addStretch()
-        actions_card.content_layout.addWidget(actions_row)
+        actions_card.add_widget(actions_row)
 
         # ── Recent Activity ─────────────────────────────────────────────────────
         activity_card = Card("Recent Activity")
         layout.addWidget(activity_card)
 
         self.activity_list = QListWidget()
-        self.activity_list.setStyleSheet("""
-            QListWidget {
-                background: #0f172a;
-                color: #e2e8f0;
-                border: none;
-                font-size: 12px;
-                padding: 4px;
-            }
-            QListWidget::item {
-                padding: 4px 8px;
-                border-bottom: 1px solid #1e293b;
-            }
-            QListWidget::item:selected { background: #1e3a5f; }
-            QListWidget::item:selected:!active { background: #1e3a5f; }
-        """)
-        for i in range(1, 11):
-            item = QListWidgetItem(f"[{i:02d}] VM operation logged")
-            self.activity_list.addItem(item)
-        self.activity_list.setMaximumHeight(160)
-        activity_card.content_layout.addWidget(self.activity_list)
-
-        # ── Skills Summary ─────────────────────────────────────────────────────
-        skills_card = Card("Available Skills (Agent Reference)")
-        layout.addWidget(skills_card)
-
-        skills_text = QLabel(
-            "• vm_lifecycle — Start, stop, reset, suspend, resume, eject ISO, configure boot\n"
-            "• guest_interaction — Execute commands, read/write/list/remove files via SSH\n"
-            "• vm_monitoring — Monitor VM health with status + guest commands\n"
-            "• iso_management — Boot from ISO, eject, manage boot order"
+        self.activity_list.setStyleSheet(
+            "QListWidget { background: " + T.BG_PRIMARY + "; color: " + T.TEXT_PRIMARY + ";"
+            " border: none; font-size: 12px; padding: 4px; }"
+            "QListWidget::item { padding: 4px 8px; border-bottom: 1px solid " + T.BG_TERTIARY + "; }"
+            "QListWidget::item:selected { background: " + T.BG_SECONDARY + "; }"
         )
-        skills_text.setStyleSheet("color: #94a3b8; font-size: 12px;")
-        skills_text.setWordWrap(True)
-        skills_text.setMargin(8)
-        skills_card.content_layout.addWidget(skills_text)
+        self.activity_list.setMaximumHeight(150)
+        activity_card.add_widget(self.activity_list)
 
-        # ── Timers ──────────────────────────────────────────────────────────────
-        self._refresh_timer = QTimer(self)
-        self._refresh_timer.timeout.connect(self._refresh_status)
-        self._refresh_timer.start(3000)
+        layout.addStretch()
 
-    def _refresh_status(self):
-        """Refresh status indicators from current VM state."""
-        # In a real app, this would query QMP
+    def set_qmp_bridge(self, bridge):
+        """Connect to the QMP bridge."""
+        self._qmp_bridge = bridge
+        if bridge:
+            bridge.vm_status.connect(self._on_vm_status)
+            bridge.connected.connect(self._on_connected)
+            bridge.error.connect(self._on_error)
+
+    def _on_vm_status(self, status: dict):
+        """Update dashboard with live VM status."""
+        if not status:
+            return
+        if "status" in status:
+            status = status["status"]
+        running = status.get("running", False) if isinstance(status, dict) else False
+        self._vm_running = running
+        self.status_dot.set_status(running)
+
+        state_text = "Running" if running else "Paused" if status.get("status") == "paused" else "Stopped"
+        self._state_label.setText(state_text)
+        self._state_label.setStyleSheet(
+            "color: " + (T.STATUS_RUNNING if running else T.STATUS_PAUSED) + ";"
+            " font-size: 14px; font-weight: 600;"
+        )
+
+        if running:
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.reset_btn.setEnabled(True)
+        else:
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            self.reset_btn.setEnabled(False)
+
+    def _on_connected(self, connected: bool):
+        """Handle QMP connect/disconnect."""
+        if not connected:
+            self.status_dot.set_status(False)
+            self._state_label.setText("Disconnected")
+
+    def _on_error(self, message: str):
+        """Handle QMP errors."""
         pass
 
     def add_activity(self, message: str):
@@ -233,48 +207,3 @@ class DashboardPanel(QWidget):
         self.activity_list.insertItem(0, item)
         if self.activity_list.count() > 20:
             self.activity_list.takeItem(self.activity_list.count() - 1)
-
-    def set_qmp_bridge(self, bridge):
-        """Connect to QMP bridge for live status updates."""
-        self._qmp_bridge = bridge
-        bridge.vm_status.connect(self.update_vm_status)
-
-    def update_vm_status(self, status: dict):
-        """Update the dashboard display with VM status from QMP."""
-        state = status.get("state", "unknown")
-        self._vm_state = state
-        self._vm_running = state in ("running", "prelaunch", "inmigrate")
-
-        # Update status dot
-        if self._vm_running:
-            self.status_dot.set_status(running=True, connected=True)
-            state_label = self.findChild(QLabel, None)
-            for child in self.findChildren(QLabel):
-                if child.styleSheet().startswith("color: #94a3b8") and "font-size: 14px" in child.styleSheet():
-                    child.setText(state.title())
-                    child.setStyleSheet("color: #22c55e; font-size: 14px; font-weight: 600;")
-                    break
-        else:
-            self.status_dot.set_status(running=False, connected=False)
-
-        # Try to extract PID from status
-        pid = status.get("pid", "—")
-        if isinstance(pid, int):
-            self._vm_pid = str(pid)
-            self._stat_labels["PID"].setText(self._vm_pid)
-            self._stat_labels["PID"].setStyleSheet("color: #64748b; font-size: 13px; font-weight: 600;")
-
-        # Update stats
-        self._update_stats_display()
-
-        # Query more data if running
-        if self._vm_running and self._qmp_bridge:
-            self._qmp_bridge.get_status()  # Refresh
-
-    def _update_stats_display(self):
-        """Refresh the stat labels in the dashboard."""
-        if self._vm_pid != "—":
-            self._stat_labels["PID"].setText(self._vm_pid)
-            self._stat_labels["PID"].setStyleSheet("color: #64748b; font-size: 13px; font-weight: 600;")
-        else:
-            self._stat_labels["PID"].setText("—")

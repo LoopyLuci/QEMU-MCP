@@ -182,6 +182,28 @@ class QMPBridge(QObject):
             self.error.emit(f"Status query failed: {e}")
             return {}
 
+    def send_command(self, command: str):
+        """Send a raw QMP command (for console use)."""
+        if self._loop is None:
+            self.error.emit("QMP bridge not started")
+            return
+        asyncio.run_coroutine_threadsafe(self._send_command_impl(command), self._loop)
+
+    async def _send_command_impl(self, command: str):
+        try:
+            client = await self._get_client()
+            if command.startswith("{"):
+                # Raw JSON
+                import json
+                msg = json.loads(command)
+                result = await client.send(msg["execute"], msg.get("arguments"))
+            else:
+                result = await client.send(command)
+            self.command_result.emit({"return": result})
+        except Exception as e:
+            logger.error("QMP command failed: %s", e)
+            self.error.emit(f"Command failed: {e}")
+
     def system_reset(self):
         """Reset the VM (warm reboot)."""
         if self._loop is None:

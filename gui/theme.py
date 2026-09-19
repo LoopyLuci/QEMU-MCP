@@ -47,6 +47,12 @@ class T:
     ERROR_BG    = "#ef444420"
     INFO        = "#38bdf8"   # Info / telemetry / QMP
 
+    # Status colors
+    STATUS_RUNNING  = "#22c55e"
+    STATUS_PAUSED   = "#f59e0b"
+    STATUS_STOPPED  = "#ef4444"
+    STATUS_OFFLINE  = "#64748b"
+
     # Status dot colors
     DOT_RUNNING_CONNECTED = "#22c55e"
     DOT_RUNNING           = "#eab308"
