@@ -6,6 +6,10 @@ logs/
 .env
 .secrets.json
 
+# ISO files (large binaries)
+iso/*.iso
+iso/*.img
+
 # Python
 __pycache__/
 *.py[cod]

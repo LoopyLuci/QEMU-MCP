@@ -169,6 +169,7 @@ class Sidebar(QWidget):
         ("QMP System Info", "📋", "sysinfo"),
         ("QMP Console", "🔧", "qmp_console"),
         ("Snapshots", "📸", "snapshots"),
+        ("ISO Manager", "💿", "iso"),
         ("Create VM", "➕", "wizard"),
         ("Storage", "💾", "storage"),
         ("CPU/Memory", "🧠", "cpu"),
@@ -384,6 +385,7 @@ class MainWindow(QMainWindow):
         from gui.panels_qmp_console import QMPConsolePanel
         from gui.panels_sysinfo import QemuSystemInfoPanel
         from gui.panels_snapshots import SnapshotPanel
+        from gui.panels_iso import ISOManagerPanel
         from gui.panels_wizard import VMCreationWizard
         from gui.panels_storage import StoragePanel
         from gui.panels_usb import USBDevicePanel
@@ -410,6 +412,7 @@ class MainWindow(QMainWindow):
             (QMPConsolePanel, "qmp_console"),
             (QemuSystemInfoPanel, "sysinfo"),
             (SnapshotPanel, "snapshots"),
+            (ISOManagerPanel, "iso"),
             (VMCreationWizard, "wizard"),
             (StoragePanel, "storage"),
             (USBDevicePanel, "usb"),
