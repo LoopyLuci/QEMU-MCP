@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import sys
 import os
+import json
+import pathlib
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QSize, QTimer, QRect, QPoint, pyqtSignal
@@ -349,28 +351,12 @@ class MainWindow(QMainWindow):
         # Don't connect — telemetry is handled by TelemetryPanel's own timer
         self._telemetry_timer.start(2000)
 
-        # ── QMP Bridge (background async → PyQt5 signals) ─────────────────────
-        from gui.qmp_bridge import QMPBridge
-        self.qmp_bridge = QMPBridge(settings=self.settings)
-        self.qmp_bridge.start()
-        self.qmp_bridge.connected.connect(self._on_qmp_connected)
-        self.qmp_bridge.vm_status.connect(self._on_vm_status)
-        self.qmp_bridge.error.connect(self._on_qmp_error)
-        self.qmp_bridge.command_result.connect(self._on_qmp_command)
-        self.qmp_client = None  # legacy compat
+        # ── Auto-reconnect timer (polls until QMP/SSH come back) ───────────────
+        self._reconnect_timer = QTimer(self)
+        self._reconnect_timer.timeout.connect(self._try_auto_reconnect)
+        self._reconnect_timer.start(5000)
 
-        # ── SSH Bridge ────────────────────────────────────────────────────────
-        from gui.ssh_bridge import SSHBridge
-        self.ssh_bridge = SSHBridge(settings=self.settings)
-        self.ssh_bridge.start()
-        self.ssh_bridge.connected.connect(self._on_ssh_connected)
-        self.ssh_bridge.command_output.connect(self._on_ssh_command_output)
-        self.ssh_bridge.file_content.connect(self._on_ssh_file_content)
-        self.ssh_bridge.file_list.connect(self._on_ssh_file_list)
-        self.ssh_bridge.error.connect(self._on_ssh_error)
-        self.ssh_bridge.connected_to.connect(self._on_ssh_connected_to)
-
-        # ── Initial status ─────────────────────────────────────────────────────
+        # ── Build panels ───────────────────────────────────────────────────────
         self._update_status_indicators()
 
     def _title_bar_mouse_press(self, event):
@@ -490,10 +476,41 @@ class MainWindow(QMainWindow):
         if panel and hasattr(panel, "append_error"):
             panel.append_error(message)
 
+    def _try_auto_reconnect(self):
+        """Periodic auto-reconnect: if bridges are running but not connected,
+        retry connecting.  Called every 5 seconds by _reconnect_timer."""
+        if self.qmp_bridge and not self.qmp_bridge.is_connected:
+            self.qmp_bridge.connect()
+        if self.ssh_bridge and not self.ssh_bridge.is_connected:
+            self.ssh_bridge.connect_ssh()
+
+    def _save_state(self):
+        """Persist window geometry and panel selection for next launch."""
+        try:
+            state_dir = pathlib.Path.home() / ".local" / "share" / "qmcmcp"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            state_file = state_dir / "window_state.json"
+            active_name = None
+            for name, panel in self.panels.items():
+                if self.panel_stack.currentWidget() is panel:
+                    active_name = name
+                    break
+            state = {
+                "geometry": self.saveGeometry().data().hex(),
+                "window_state": self.saveState().data().hex(),
+                "active_panel": active_name,
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+        except Exception:
+            pass  # Never let state save crash the app
+
     def closeEvent(self, event):
         """Clean up on close."""
+        # Save window state for next launch
+        self._save_state()
         # Don't disconnect — VM should keep running
         self._telemetry_timer.stop()
+        self._reconnect_timer.stop()
         if self.qmp_bridge:
             self.qmp_bridge.stop()
         if self.ssh_bridge:
