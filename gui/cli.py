@@ -22,8 +22,10 @@ import logging
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+# Add src and project root to path
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR / "src"))
+sys.path.insert(0, str(SCRIPT_DIR.parent))
 
 from vm_mcp.config import VmMCPSettings, Secrets
 
