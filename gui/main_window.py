@@ -166,6 +166,10 @@ class Sidebar(QWidget):
         ("Telemetry", "📈", "telemetry"),
         ("QMP Console", "🔧", "qmp_console"),
         ("Snapshots", "📸", "snapshots"),
+        ("Create VM", "➕", "wizard"),
+        ("Storage", "💾", "storage"),
+        ("Network", "🌐", "network"),
+        ("Monitoring", "📊", "monitoring"),
         ("Settings", "⚙️", "settings"),
         ("Security", "🔒", "security"),
         ("Logs", "📋", "logs"),
@@ -369,6 +373,10 @@ class MainWindow(QMainWindow):
         from gui.panels_telemetry import TelemetryPanel
         from gui.panels_qmp_console import QMPConsolePanel
         from gui.panels_snapshots import SnapshotPanel
+        from gui.panels_wizard import VMCreationWizard
+        from gui.panels_storage import StoragePanel
+        from gui.panels_network import NetworkPanel
+        from gui.panels_monitoring import MonitoringPanel
         from gui.panels_settings import SettingsPanel
         from gui.panels_security import SecurityPanel
         from gui.panels_logs import LogsPanel
@@ -382,6 +390,10 @@ class MainWindow(QMainWindow):
             (TelemetryPanel, "telemetry"),
             (QMPConsolePanel, "qmp_console"),
             (SnapshotPanel, "snapshots"),
+            (VMCreationWizard, "wizard"),
+            (StoragePanel, "storage"),
+            (NetworkPanel, "network"),
+            (MonitoringPanel, "monitoring"),
             (SettingsPanel, "settings"),
             (SecurityPanel, "security"),
             (LogsPanel, "logs"),
