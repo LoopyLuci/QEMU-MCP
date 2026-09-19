@@ -291,6 +291,7 @@ class VMControlPanel(QWidget):
             self._show_info("QMP bridge not available", success=False)
             return
         self._show_info("Starting VM...", success=True)
+        self._qmp_bridge.cont()
         self.progress.show()
 
     def _qmp_stop(self):

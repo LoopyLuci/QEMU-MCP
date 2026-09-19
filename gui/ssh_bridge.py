@@ -84,6 +84,10 @@ class SSHBridge(QObject):
             return
         asyncio.run_coroutine_threadsafe(self._connect_impl(), self._loop)
 
+    def connect(self):
+        """Alias for connect_ssh() for panel compatibility."""
+        self.connect_ssh()
+
     async def _connect_impl(self):
         try:
             await ssh_mod._connect(self._secrets, self._settings)
@@ -106,6 +110,10 @@ class SSHBridge(QObject):
             return
         asyncio.run_coroutine_threadsafe(self._disconnect_impl(), self._loop)
 
+    def disconnect(self):
+        """Alias for disconnect_ssh() for panel compatibility."""
+        self.disconnect_ssh()
+
     async def _disconnect_impl(self):
         try:
             await ssh_mod.disconnect()
@@ -115,16 +123,21 @@ class SSHBridge(QObject):
             logger.error("SSH disconnect failed: %s", e)
             self.error.emit(f"SSH disconnect failed: {e}")
 
-    def run_command(self, command: str):
+    def run_command(self, command: str, timeout: int = 30, max_output: int = 10000):
         """Run a command on the guest via SSH."""
         if self._loop is None:
             self.error.emit("SSH bridge not started")
             return
-        asyncio.run_coroutine_threadsafe(self._run_command_impl(command), self._loop)
+        asyncio.run_coroutine_threadsafe(self._run_command_impl(command, timeout, max_output), self._loop)
 
-    async def _run_command_impl(self, command: str):
+    async def _run_command_impl(self, command: str, timeout: int, max_output: int):
         try:
-            output = await ssh_mod.run_guest_command(command, secrets=self._secrets, settings=self._settings)
+            result = await ssh_mod.run_guest_command(
+                command, secrets=self._secrets, settings=self._settings
+            )
+            output = f"Exit: {result['exit_code']}\n{result['stdout']}"
+            if result['stderr']:
+                output += f"\nstderr: {result['stderr']}"
             self.command_output.emit(output)
         except Exception as e:
             logger.error("SSH command failed: %s", e)

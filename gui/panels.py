@@ -115,6 +115,7 @@ class DashboardPanel(QWidget):
             "QPushButton:hover { background: #16a34a; }"
             "QPushButton:disabled { background: #22c55e20; color: " + T.TEXT_MUTED + "; }"
         )
+        self.start_btn.clicked.connect(self._on_start_vm)
         actions_row_layout.addWidget(self.start_btn)
 
         self.stop_btn = QPushButton("■  Stop VM")
@@ -125,6 +126,7 @@ class DashboardPanel(QWidget):
             "QPushButton:hover { background: #dc2626; }"
             "QPushButton:disabled { background: #ef444420; color: " + T.TEXT_MUTED + "; }"
         )
+        self.stop_btn.clicked.connect(self._on_stop_vm)
         actions_row_layout.addWidget(self.stop_btn)
 
         self.reset_btn = QPushButton("↻  Reset VM")
@@ -135,6 +137,7 @@ class DashboardPanel(QWidget):
             "QPushButton:hover { background: #d97706; }"
             "QPushButton:disabled { background: #f59e0b20; color: " + T.TEXT_MUTED + "; }"
         )
+        self.reset_btn.clicked.connect(self._on_reset_vm)
         actions_row_layout.addWidget(self.reset_btn)
         actions_row_layout.addStretch()
         actions_card.add_widget(actions_row)
@@ -218,6 +221,24 @@ class DashboardPanel(QWidget):
     def _on_error(self, message: str):
         """Handle QMP errors."""
         pass
+
+    def _on_start_vm(self):
+        """Start VM via QMP bridge."""
+        if self._qmp_bridge:
+            self._qmp_bridge.cont()
+            self.add_activity("VM start requested")
+
+    def _on_stop_vm(self):
+        """Stop VM via QMP bridge."""
+        if self._qmp_bridge:
+            self._qmp_bridge.system_powerdown()
+            self.add_activity("VM stop requested")
+
+    def _on_reset_vm(self):
+        """Reset VM via QMP bridge."""
+        if self._qmp_bridge:
+            self._qmp_bridge.system_reset()
+            self.add_activity("VM reset requested")
 
     def add_activity(self, message: str):
         """Add an activity log entry."""
