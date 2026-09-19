@@ -86,7 +86,7 @@ class TestPanelInitialization:
 
     def test_all_panels_instantiate(self, main_window):
         """All 23 panels should instantiate without error."""
-        assert len(main_window.panels) == 23
+        assert len(main_window.panels) == 25
 
     def test_panel_names_match_expected(self, main_window):
         """Panel names should match sidebar entries."""
@@ -95,7 +95,7 @@ class TestPanelInitialization:
             "guest_agent", "telemetry", "qmp_console", "sysinfo",
             "snapshots", "wizard", "storage", "cpu", "display", "qemu",
             "usb", "network", "automation", "troubleshoot", "monitoring",
-            "settings", "security", "logs", "iso"
+            "settings", "security", "logs", "iso", "chat", "providers"
         }
         assert set(main_window.panels.keys()) == expected
 

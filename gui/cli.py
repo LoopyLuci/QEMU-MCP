@@ -78,8 +78,11 @@ def cmd_snapshot_list(args):
     if not disk or not Path(disk).exists():
         print(json.dumps({"error": "VM disk not found"}))
         return
+    qemu_img = Path(settings.qemu_binary).parent / "qemu-img.exe"
+    if not qemu_img.exists():
+        qemu_img = "qemu-img"
     result = subprocess.run(
-        ["qemu-img", "snapshot", "-l", str(disk)],
+        [str(qemu_img), "snapshot", "-l", str(disk)],
         capture_output=True, text=True, timeout=10
     )
     print(json.dumps({"snapshots": result.stdout.strip()}, indent=2))
@@ -175,6 +178,12 @@ def main():
     # iso
     subparsers.add_parser("iso", help="List ISOs").add_argument("action", nargs="?", default="list")
 
+    # providers
+    providers_parser = subparsers.add_parser("providers", help="Manage AI providers")
+    providers_sub = providers_parser.add_subparsers(dest="providers_command")
+    providers_sub.add_parser("list", help="List providers")
+    providers_sub.add_parser("usage", help="Show usage summary")
+
     # config
     subparsers.add_parser("config", help="Get configuration").add_argument("action", nargs="?", default="get")
 
@@ -211,18 +220,16 @@ def main():
 
     handler = commands.get(args.command)
     if isinstance(handler, dict):
-        if not hasattr(args, "vm_command") or not args.vm_command:
+        if args.command == "vm":
+            sub = getattr(args, "vm_command", None)
+        elif args.command == "snapshot":
+            sub = getattr(args, "snap_command", None)
+        else:
+            sub = None
+        if not sub:
             parser.parse_args([args.command, "--help"])
             return
-        handler = handler.get(args.vm_command)
-        if not handler:
-            parser.parse_args([args.command, "--help"])
-            return
-    elif isinstance(handler, dict):
-        if not hasattr(args, "snap_command") or not args.snap_command:
-            parser.parse_args([args.command, "--help"])
-            return
-        handler = handler.get(args.snap_command)
+        handler = handler.get(sub)
         if not handler:
             parser.parse_args([args.command, "--help"])
             return

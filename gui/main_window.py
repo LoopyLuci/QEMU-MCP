@@ -182,6 +182,8 @@ class Sidebar(QWidget):
         ("Security", "🔒", "security"),
         ("Automation", "🤖", "automation"),
         ("Troubleshoot", "🔍", "troubleshoot"),
+        ("AI Chat", "💬", "chat"),
+        ("AI Providers", "🤖", "providers"),
     ]
 
     def __init__(self, parent=None):
@@ -396,6 +398,8 @@ class MainWindow(QMainWindow):
         from gui.panels_qemu import AdvancedQEmuPanel
         from gui.panels_automation import AutomationPanel
         from gui.panels_troubleshoot import TroubleshootPanel
+        from gui.panels_chat import ChatPanel
+        from gui.panels_providers import AIProvidersPanel
         from gui.panels_settings import SettingsPanel
         from gui.panels_security import SecurityPanel
         from gui.panels_logs import LogsPanel
@@ -422,6 +426,8 @@ class MainWindow(QMainWindow):
             (AdvancedQEmuPanel, "qemu"),
             (AutomationPanel, "automation"),
             (TroubleshootPanel, "troubleshoot"),
+            (ChatPanel, "chat"),
+            (AIProvidersPanel, "providers"),
             (MonitoringPanel, "monitoring"),
             (SettingsPanel, "settings"),
             (SecurityPanel, "security"),

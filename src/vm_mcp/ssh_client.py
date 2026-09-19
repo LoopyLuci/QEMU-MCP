@@ -19,10 +19,12 @@ from vm_mcp.config import Secrets, VmMCPSettings
 
 logger = logging.getLogger(__name__)
 
+import threading
+
 # ── Connection cache ────────────────────────────────────────────────────────────
 
 _connection: asyncssh.SSHClientConnection | None = None
-_connection_lock = asyncio.Lock()
+_connection_lock = threading.Lock()
 
 
 # ── Connection management ───────────────────────────────────────────────────────
@@ -31,32 +33,31 @@ async def _connect(secrets: Secrets, settings: VmMCPSettings) -> asyncssh.SSHCli
     """Establish or return a cached SSH connection to the guest."""
     global _connection
 
-    async with _connection_lock:
-        if _connection is not None:
-            # Check if the connection is still alive
-            try:
-                if not _connection.is_closed():
-                    return _connection
-            except Exception:
-                pass
-            _connection = None
-
-        kwargs = settings.ssh_connect_kwargs(secrets)
-
-        # Log attempt without exposing credentials
-        ssh_desc = "key" if secrets.get_ssh_private_key() else "password"
-        logger.info("Connecting to SSH %s on %s:%d (%s auth)", ssh_desc, settings.ssh_host, settings.ssh_port, settings.ssh_username)
-
+    if _connection is not None:
+        # Check if the connection is still alive
         try:
-            _connection = await asyncssh.connect(**kwargs)
-            logger.info("SSH connected to %s@%s:%d", settings.ssh_username, settings.ssh_host, settings.ssh_port)
-            if settings.ssh_keepalive_sec > 0:
-                _connection.set_keepalive(settings.ssh_keepalive_sec)
-            return _connection
-        except asyncssh.PermissionDenied as e:
-            raise RuntimeError(f"SSH authentication failed for {settings.ssh_username}@{settings.ssh_host}:{settings.ssh_port}") from e
-        except Exception as e:
-            raise RuntimeError(f"SSH connection failed: {e}") from e
+            if not _connection.is_closed():
+                return _connection
+        except Exception:
+            pass
+        _connection = None
+
+    kwargs = settings.ssh_connect_kwargs(secrets)
+
+    # Log attempt without exposing credentials
+    ssh_desc = "key" if secrets.get_ssh_private_key() else "password"
+    logger.info("Connecting to SSH %s on %s:%d (%s auth)", ssh_desc, settings.ssh_host, settings.ssh_port, settings.ssh_username)
+
+    try:
+        _connection = await asyncssh.connect(**kwargs)
+        logger.info("SSH connected to %s@%s:%d", settings.ssh_username, settings.ssh_host, settings.ssh_port)
+        if settings.ssh_keepalive_sec > 0:
+            _connection.set_keepalive(settings.ssh_keepalive_sec)
+        return _connection
+    except asyncssh.PermissionDenied as e:
+        raise RuntimeError(f"SSH authentication failed for {settings.ssh_username}@{settings.ssh_host}:{settings.ssh_port}") from e
+    except Exception as e:
+        raise RuntimeError(f"SSH connection failed: {e}") from e
 
 
 async def _close() -> None:
