@@ -80,6 +80,8 @@ class DashboardPanel(QWidget):
         stats_row_layout.setContentsMargins(0, 0, 0, 0)
         stats_row_layout.setSpacing(16)
 
+        self._stat_labels: dict[str, QLabel] = {}
+
         for label, value, color in [
             ("PID", "—", "#64748b"),
             ("RAM", "8.0 GB", "#38bdf8"),
@@ -98,6 +100,7 @@ class DashboardPanel(QWidget):
             sl.addWidget(sl_label)
             sl.addWidget(sl_value)
             stats_row_layout.addWidget(stat)
+            self._stat_labels[label] = sl_value
 
         stats_row_layout.addStretch()
         status_card.content_layout.addWidget(status_row)

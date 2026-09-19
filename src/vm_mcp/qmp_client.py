@@ -59,10 +59,12 @@ class QMPClient:
             path = self.uri[6:]
             self._reader, self._writer = await asyncio.open_unix_connection(path)
         else:
-            # Parse tcp:host:port
-            parts = self.uri.split(":")
-            host = parts[1]
-            port = int(parts[2])
+            # Parse tcp:host:port — host may contain colons (IPv6) or dots (IPv4)
+            # Format: tcp:HOST:PORT
+            rest = self.uri[4:]  # strip "tcp:"
+            last_colon = rest.rfind(":")
+            host = rest[:last_colon]
+            port = int(rest[last_colon + 1:])
             self._reader, self._writer = await asyncio.open_connection(host, port)
 
         self._connected = True
@@ -102,16 +104,12 @@ class QMPClient:
     async def _read_response(self) -> dict[str, Any]:
         """Read one JSON response line from QMP."""
         assert self._reader is not None
-        data = b""
-        while not data.endswith(b"\n"):
-            chunk = await asyncio.wait_for(
-                self._reader.read(1),
-                timeout=self._timeout,
-            )
-            if not chunk:
-                raise RuntimeError("QMP connection closed while reading response")
-            data += chunk
-
+        data = await asyncio.wait_for(
+            self._reader.readuntil(b"\n"),
+            timeout=self._timeout,
+        )
+        if not data:
+            raise RuntimeError("QMP connection closed while reading response")
         response = json.loads(data.decode())
         if "error" in response:
             raise RuntimeError(

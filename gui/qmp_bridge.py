@@ -35,6 +35,8 @@ class QMPBridge(QObject):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self._settings = settings
+        from vm_mcp.config import Secrets
+        self._secrets = Secrets.from_env()
         self._qmp_uri = self._build_uri()
         self._connected = False
         self._thread: QThread | None = None
@@ -85,7 +87,9 @@ class QMPBridge(QObject):
     async def _get_client(self) -> QMPClient:
         """Get or create the QMP client, connecting if needed."""
         if self._client is None or not self._client.is_connected:
-            self._client = QMPClient(uri=self._qmp_uri, password=self._secrets.get_qmp_password())
+            self._client = QMPClient(
+                uri=self._build_uri(), password=self._secrets.get_qmp_password()
+            )
             await self._client.connect()
             self._connected = True
             self.connected.emit(True)
