@@ -86,9 +86,7 @@ class SSHBridge(QObject):
 
     async def _connect_impl(self):
         try:
-            kwargs = self._settings.ssh_connect_kwargs()
-            kwargs["secrets"] = self._secrets
-            await ssh_mod.connect(**kwargs)
+            await ssh_mod._connect(self._secrets, self._settings)
             self._connected = True
             self._ever_connected = True
             self.connected.emit(True)
@@ -126,9 +124,7 @@ class SSHBridge(QObject):
 
     async def _run_command_impl(self, command: str):
         try:
-            kwargs = self._settings.ssh_connect_kwargs()
-            kwargs["secrets"] = self._secrets
-            output = await ssh_mod.run_command(command, **kwargs)
+            output = await ssh_mod.run_guest_command(command, secrets=self._secrets, settings=self._settings)
             self.command_output.emit(output)
         except Exception as e:
             logger.error("SSH command failed: %s", e)
@@ -143,9 +139,7 @@ class SSHBridge(QObject):
 
     async def _read_file_impl(self, path: str):
         try:
-            kwargs = self._settings.ssh_connect_kwargs()
-            kwargs["secrets"] = self._secrets
-            content = await ssh_mod.read_file(path, **kwargs)
+            content, enc = await ssh_mod.read_guest_file(path, secrets=self._secrets, settings=self._settings)
             self.file_content.emit(content)
         except Exception as e:
             logger.error("SSH read_file failed: %s", e)
@@ -162,9 +156,7 @@ class SSHBridge(QObject):
 
     async def _write_file_impl(self, path: str, content: str):
         try:
-            kwargs = self._settings.ssh_connect_kwargs()
-            kwargs["secrets"] = self._secrets
-            await ssh_mod.write_file(path, content, **kwargs)
+            await ssh_mod.write_guest_file(path, content, secrets=self._secrets, settings=self._settings)
             self.command_output.emit(f"Written: {path}")
         except Exception as e:
             logger.error("SSH write_file failed: %s", e)
@@ -179,9 +171,7 @@ class SSHBridge(QObject):
 
     async def _list_dir_impl(self, path: str):
         try:
-            kwargs = self._settings.ssh_connect_kwargs()
-            kwargs["secrets"] = self._secrets
-            entries = await ssh_mod.list_dir(path, **kwargs)
+            entries = await ssh_mod.list_guest_directory(path, secrets=self._secrets, settings=self._settings)
             self.file_list.emit(entries)
         except Exception as e:
             logger.error("SSH list_dir failed: %s", e)
@@ -196,9 +186,7 @@ class SSHBridge(QObject):
 
     async def _remove_file_impl(self, path: str):
         try:
-            kwargs = self._settings.ssh_connect_kwargs()
-            kwargs["secrets"] = self._secrets
-            await ssh_mod.remove_file(path, **kwargs)
+            await ssh_mod.remove_guest_path(path, secrets=self._secrets, settings=self._settings)
             self.command_output.emit(f"Removed: {path}")
         except Exception as e:
             logger.error("SSH remove_file failed: %s", e)

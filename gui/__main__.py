@@ -18,13 +18,17 @@ import argparse
 import os
 import sys
 
-# Ensure src is on path
+# Ensure src and project root are on path
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
+src_dir = os.path.join(project_root, "src")
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from gui.main_window import MainWindow
+from gui.widgets import apply_global_theme
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 
@@ -79,6 +83,9 @@ def main(argv: list[str] | None = None) -> None:
     app.setApplicationName("QEMU-MCP")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("QEMU-MCP")
+
+    # Apply dark theme
+    apply_global_theme(app)
 
     window = MainWindow()
 

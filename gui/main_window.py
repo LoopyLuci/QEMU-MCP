@@ -30,10 +30,13 @@ from PyQt5.QtWidgets import (
     QMessageBox,
 )
 
-# Ensure project root is on path
+# Ensure project root and src are on path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+SRC_DIR = PROJECT_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from vm_mcp.config import VmMCPSettings, Secrets
 from vm_mcp.qmp_client import QMPClient
