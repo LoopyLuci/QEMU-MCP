@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 from typing import Any
 
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -12,7 +13,26 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from vm_mcp.config import VmMCPSettings, Secrets
 from vm_mcp import ssh_client as ssh_mod
 
-logger = logging.getLogger("qmcmcp.ssh_bridge")
+logger = logging.getLogger("vmharness.ssh_bridge")
+
+
+# ── SSH bridge exceptions ──────────────────────────────────────────────────────
+
+class SSHBridgeError(Exception):
+    """Base exception for SSH bridge failures."""
+    pass
+
+class SSHConnectionError(SSHBridgeError):
+    """SSH connection failed or was lost."""
+    pass
+
+class SSHTimeoutError(SSHBridgeError):
+    """SSH operation timed out."""
+    pass
+
+class SSHAuthError(SSHBridgeError):
+    """SSH authentication failed."""
+    pass
 
 
 class SSHBridge(QObject):
@@ -37,11 +57,16 @@ class SSHBridge(QObject):
         self._settings = settings
         self._secrets = Secrets.from_env()
         self._connected = False
-        self._connecting = False  # Prevent concurrent connect attempts
+        self._connecting = False
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._ever_connected = False
         self._loop_ready = threading.Event()
+        self._lock = threading.Lock()  # protects _connected, _connecting
+        self._reconnect_delay = 1.0
+        self._max_reconnect_delay = 30.0
+        self._reconnect_attempts = 0
+        self._should_reconnect = True
 
     # ── Thread lifecycle ─────────────────────────────────────────────────────
 
@@ -61,7 +86,9 @@ class SSHBridge(QObject):
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread is not None:
             self._thread.join(timeout=5.0)
-        self._connected = False
+        with self._lock:
+            self._connected = False
+            self._connecting = False
 
     def _run_loop(self):
         """Run the asyncio event loop — executes inside the worker thread."""
@@ -74,7 +101,8 @@ class SSHBridge(QObject):
 
     @property
     def is_connected(self) -> bool:
-        return self._connected
+        with self._lock:
+            return self._connected
 
     # ── Public API (called from GUI thread) ────────────────────────────────
 
@@ -83,10 +111,10 @@ class SSHBridge(QObject):
         if self._loop is None or not self._loop.is_running():
             self.error.emit("SSH bridge not started")
             return
-        # Don't fire multiple concurrent connect attempts
-        if self._connecting:
-            return
-        self._connecting = True
+        with self._lock:
+            if self._connecting:
+                return
+            self._connecting = True
         asyncio.run_coroutine_threadsafe(self._connect_impl(), self._loop)
 
     def connect(self):
@@ -94,25 +122,68 @@ class SSHBridge(QObject):
         self.connect_ssh()
 
     async def _connect_impl(self):
-        try:
-            await ssh_mod._connect(self._secrets, self._settings)
-            self._connected = True
-            self._ever_connected = True
-            self.connected.emit(True)
-            host = self._settings.ssh_host
-            port = self._settings.ssh_port
-            user = self._settings.ssh_username
-            self.connected_to.emit(host, port, user)
-        except Exception as e:
-            logger.error("SSH connect failed: %s", e)
-            self._connected = False
-            self.connected.emit(False)
-            self.error.emit(f"SSH connection failed: {e}")
-        finally:
-            self._connecting = False
+        max_attempts = 30
+        for attempt in range(max_attempts):
+            try:
+                await ssh_mod._connect(self._secrets, self._settings)
+                with self._lock:
+                    self._connected = True
+                    self._ever_connected = True
+                    self._connecting = False
+                    self._reconnect_delay = 1.0
+                    self._reconnect_attempts = 0
+                self.connected.emit(True)
+                host = self._settings.ssh_host
+                port = self._settings.ssh_port
+                user = self._settings.ssh_username
+                self.connected_to.emit(host, port, user)
+                self._should_reconnect = True
+                return
+            except SSHAuthError as e:
+                logger.error("SSH auth failed: %s", e)
+                with self._lock:
+                    self._connected = False
+                    self._connecting = False
+                self.connected.emit(False)
+                self.error.emit(f"SSH authentication failed: {e}")
+                self._should_reconnect = False
+                return
+            except SSHTimeoutError as e:
+                logger.error("SSH connection timed out: %s", e)
+                with self._lock:
+                    self._connected = False
+                    self._connecting = False
+                self.connected.emit(False)
+                self.error.emit(f"SSH connection timed out: {e}")
+                self._should_reconnect = False
+                return
+            except SSHConnectionError as e:
+                logger.debug("SSH attempt %d/%d failed: %s", attempt + 1, max_attempts, e)
+                with self._lock:
+                    self._connected = False
+                    self._connecting = False
+                if not self._should_reconnect:
+                    self.connected.emit(False)
+                    self.error.emit(f"SSH connection failed: {e}")
+                    return
+                # Exponential backoff
+                wait = min(self._reconnect_delay, self._max_reconnect_delay)
+                await asyncio.sleep(wait)
+                self._reconnect_delay = min(self._reconnect_delay * 2, self._max_reconnect_delay)
+            except Exception as e:
+                logger.error("SSH connect failed: %s", e)
+                with self._lock:
+                    self._connected = False
+                    self._connecting = False
+                self.connected.emit(False)
+                self.error.emit(f"SSH connection failed: {e}")
+                self._should_reconnect = False
+                return
 
     def disconnect_ssh(self):
         """Disconnect from the guest SSH server."""
+        with self._lock:
+            self._should_reconnect = False
         if self._loop is None:
             return
         asyncio.run_coroutine_threadsafe(self._disconnect_impl(), self._loop)
@@ -124,8 +195,13 @@ class SSHBridge(QObject):
     async def _disconnect_impl(self):
         try:
             await ssh_mod.disconnect()
-            self._connected = False
+            with self._lock:
+                self._connected = False
+                self._connecting = False
             self.connected.emit(False)
+        except SSHConnectionError as e:
+            logger.error("SSH disconnect failed (connection error): %s", e)
+            self.error.emit(f"SSH disconnect failed: {e}")
         except Exception as e:
             logger.error("SSH disconnect failed: %s", e)
             self.error.emit(f"SSH disconnect failed: {e}")
@@ -139,13 +215,25 @@ class SSHBridge(QObject):
 
     async def _run_command_impl(self, command: str, timeout: int, max_output: int):
         try:
-            result = await ssh_mod.run_guest_command(
-                command, secrets=self._secrets, settings=self._settings
+            result = await asyncio.wait_for(
+                ssh_mod.run_guest_command(
+                    command, secrets=self._secrets, settings=self._settings
+                ),
+                timeout=timeout,
             )
             output = f"Exit: {result['exit_code']}\n{result['stdout']}"
             if result['stderr']:
                 output += f"\nstderr: {result['stderr']}"
             self.command_output.emit(output)
+        except asyncio.TimeoutError:
+            logger.error("SSH command timed out after %ds", timeout)
+            self.error.emit(f"Command timed out after {timeout}s")
+        except SSHAuthError as e:
+            logger.error("SSH auth error during command: %s", e)
+            self.error.emit(f"SSH authentication failed: {e}")
+        except SSHConnectionError as e:
+            logger.error("SSH connection lost during command: %s", e)
+            self.error.emit(f"SSH connection lost: {e}")
         except Exception as e:
             logger.error("SSH command failed: %s", e)
             self.error.emit(f"Command failed: {e}")
@@ -161,6 +249,9 @@ class SSHBridge(QObject):
         try:
             content, enc = await ssh_mod.read_guest_file(path, secrets=self._secrets, settings=self._settings)
             self.file_content.emit(content)
+        except SSHConnectionError as e:
+            logger.error("SSH connection lost during read: %s", e)
+            self.error.emit(f"SSH connection lost: {e}")
         except Exception as e:
             logger.error("SSH read_file failed: %s", e)
             self.error.emit(f"Read file failed: {e}")
@@ -178,6 +269,9 @@ class SSHBridge(QObject):
         try:
             await ssh_mod.write_guest_file(path, content, secrets=self._secrets, settings=self._settings)
             self.command_output.emit(f"Written: {path}")
+        except SSHConnectionError as e:
+            logger.error("SSH connection lost during write: %s", e)
+            self.error.emit(f"SSH connection lost: {e}")
         except Exception as e:
             logger.error("SSH write_file failed: %s", e)
             self.error.emit(f"Write file failed: {e}")
@@ -193,6 +287,9 @@ class SSHBridge(QObject):
         try:
             entries = await ssh_mod.list_guest_directory(path, secrets=self._secrets, settings=self._settings)
             self.file_list.emit(entries)
+        except SSHConnectionError as e:
+            logger.error("SSH connection lost during list: %s", e)
+            self.error.emit(f"SSH connection lost: {e}")
         except Exception as e:
             logger.error("SSH list_dir failed: %s", e)
             self.error.emit(f"List dir failed: {e}")
@@ -208,6 +305,9 @@ class SSHBridge(QObject):
         try:
             await ssh_mod.remove_guest_path(path, secrets=self._secrets, settings=self._settings)
             self.command_output.emit(f"Removed: {path}")
+        except SSHConnectionError as e:
+            logger.error("SSH connection lost during remove: %s", e)
+            self.error.emit(f"SSH connection lost: {e}")
         except Exception as e:
             logger.error("SSH remove_file failed: %s", e)
             self.error.emit(f"Remove file failed: {e}")

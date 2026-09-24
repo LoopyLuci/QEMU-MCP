@@ -270,7 +270,7 @@ class GuestTerminalPanel(QWidget):
         self._ssh_bridge = None
 
         # Seed terminal with welcome
-        self.terminal.append_line("QEMU-MCP Guest Terminal — connected to omarchy-vm", "INFO")
+        self.terminal.append_line("VM-Harness Guest Terminal — connected to omarchy-vm", "INFO")
         self.terminal.append_line("Type commands and press Enter to execute.", "INFO")
         self.terminal.append_line("Use the file browser to navigate the guest filesystem.", "INFO")
         self.terminal.append_line("", "INFO")

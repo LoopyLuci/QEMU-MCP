@@ -22,7 +22,7 @@ from vm_mcp.tools.base import Extension, Tool, tool
     description=(
         "Run a shell command inside the Omarchy guest VM via SSH and return "
         "the stdout, stderr, and exit code.  The command runs as the configured "
-        "SSH user (OmarchyVM).  Non-interactive commands only — use 'command "
+        "SSH user (vmharness).  Non-interactive commands only — use 'command "
         "&& command' or a script for complex workflows.  Returns a JSON object "
         "with stdout, stderr, exit_code, and success fields."
     ),

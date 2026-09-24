@@ -1,4 +1,4 @@
-"""QEMU-MCP GUI — PyQt5 desktop application for QEMU/VM control.
+"""VM-Harness GUI — PyQt5 desktop application for QEMU/VM control.
 
 Provides a polished, professional graphical interface for managing
 QEMU virtual machines, monitoring telemetry, interacting with guest
@@ -35,7 +35,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 __version__ = "1.0.0"
-__author__ = "QEMU-MCP Team"
+__author__ = "VM-Harness Team"
 
 from gui.main_window import MainWindow, main as gui_main
 from gui.widgets import (

@@ -1,4 +1,4 @@
-"""Design token system and theme engine for QEMU-MCP GUI.
+"""Design token system and theme engine for VM-Harness GUI.
 
 Centralized design tokens (colors, typography, spacing, shadows, border radii)
 and QSS generators for consistent styling across all widgets.
@@ -38,6 +38,7 @@ class T:
     BRAND       = "#3b82f6"   # Primary brand color
     BRAND_HOVER = "#2563eb"   # Brand hover
     BRAND_ACTIVE= "#1d4ed8"   # Brand active
+    ACCENT      = "#a78bfa"   # Accent (toggles, highlights)
 
     SUCCESS     = "#22c55e"   # Success / running / connected
     SUCCESS_BG  = "#22c55e20"

@@ -1,6 +1,6 @@
 # Known Limitations
 
-This document lists environment-specific gaps that are **not code defects** — the QEMU-MCP server and GUI are fully functional, but certain end-to-end scenarios require guest-side or host-side configuration that this environment does not provide.
+This document lists environment-specific gaps that are **not code defects** — the VM-Harness server and GUI are fully functional, but certain end-to-end scenarios require guest-side or host-side configuration that this environment does not provide.
 
 ---
 

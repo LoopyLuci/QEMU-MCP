@@ -1,0 +1,4 @@
+#!/bin/bash
+# Gradle wrapper script — delegates to the gradlew binary
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$DIR/gradlew" "$@"

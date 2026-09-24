@@ -6,6 +6,9 @@ logs/
 .env
 .secrets.json
 
+# SSH known hosts
+known_hosts
+
 # ISO files (large binaries)
 iso/*.iso
 iso/*.img
@@ -18,6 +21,9 @@ dist/
 build/
 .eggs/
 *.so
+
+# PyInstaller
+*.spec
 
 # IDE
 .idea/
@@ -32,7 +38,7 @@ Thumbs.db
 
 # GUI credential store (encrypted secrets — never commit)
 .local/share/qmcmcp/
-XDG_DATA_HOME/qmcmcp/
+.config/qmcmcp/
 %LOCALAPPDATA%\qmcmcp\
 
 # Test artifacts
@@ -41,3 +47,53 @@ XDG_DATA_HOME/qmcmcp/
 htmlcov/
 test-results/
 gui.log
+
+# Credential store data files
+credentials.json
+.master_key
+master_key
+keyfile
+
+# Secrets and tokens
+token.txt
+token_new.txt
+fresh_token.txt
+final_token.txt
+final_pairing_token.txt
+pairing_token.txt
+pairing_token_full.txt
+android_token.txt
+pairing_qr.png
+
+# TLS certificates and keys
+cert.pem
+key.pem
+
+# Machine IDs and signing keys
+.qmcmcp_machine_id
+.vmharness_machine_id
+.vmharness_signing_key
+
+# Runtime files
+.vm_gui.pid
+gui/.vmharness_single_instance.lock
+file
+
+# Virtual environment
+.venv/
+
+# Built binaries
+VM-Harness-Installer.exe
+
+# Android build artifacts
+android/build/
+android/.gradle/
+android/local.properties
+
+# Audit database
+.audit/audit.db
+
+# CI build artifacts (binaries)
+ci/artifacts/desktop/*.exe
+ci/artifacts/desktop/*.zip
+ci/artifacts/desktop/*.sha256

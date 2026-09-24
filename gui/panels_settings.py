@@ -7,6 +7,8 @@ Changes are saved to .env and take effect on next server restart.
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -29,14 +31,19 @@ from PyQt5.QtWidgets import (
 )
 
 from gui.widgets import Card, TextInput
+from gui.settings_schema import load_settings, save_settings, migrate_settings
 
 
 class SettingsPanel(QWidget):
     """All configurable settings organized by category."""
 
+    #: Path to the JSON settings file (managed by settings_schema)
+    JSON_SETTINGS_PATH = "gui/settings.json"
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setStyleSheet("background: #0f172a;")
+        self._json_settings: dict[str, Any] = load_settings(self.JSON_SETTINGS_PATH)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -316,6 +323,69 @@ class SettingsPanel(QWidget):
         disp_layout.addStretch()
         self.tabs.addTab(disp_tab, "Display")
 
+        # ── Acceleration Tab ─────────────────────────────────────────────────────
+        accel_tab = QWidget()
+        accel_tab.setStyleSheet("background: #0f172a;")
+        accel_layout = QVBoxLayout(accel_tab)
+        accel_layout.setContentsMargins(12, 12, 12, 12)
+        accel_layout.setSpacing(8)
+
+        accel_card = Card("Hardware Acceleration Mode")
+        accel_layout.addWidget(accel_card)
+
+        # Acceleration Mode
+        mode_row = QWidget()
+        mode_row_layout = QHBoxLayout(mode_row)
+        mode_row_layout.setContentsMargins(0, 0, 0, 0)
+        mode_row_layout.setSpacing(8)
+        mode_label = QLabel("Acceleration Mode:")
+        mode_label.setStyleSheet("color: #cbd5e1; font-size: 12px;")
+        mode_label.setFixedWidth(120)
+        mode_row_layout.addWidget(mode_label)
+        self.accel_mode_combo = QComboBox()
+        self.accel_mode_combo.addItems(["whpx", "haxm", "tcg"])
+        self.accel_mode_combo.setCurrentText("whpx")
+        self.accel_mode_combo.setFixedWidth(140)
+        self.accel_mode_combo.setStyleSheet("""
+            QComboBox {
+                background: #0f172a;
+                color: #e2e8f0;
+                border: 1px solid #334155;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+            QComboBox:hover { border-color: #3b82f6; }
+        """)
+        mode_row_layout.addWidget(self.accel_mode_combo)
+        mode_row_layout.addStretch()
+        accel_card.content_layout.addWidget(mode_row)
+
+        # Description label
+        self.accel_desc = QLabel(
+            "WHPX: Windows Hypervisor Platform — best performance on Windows 10/11.\n"
+            "HAXM: Hardware Accelerator for x86 (Intel VT-x, older systems).\n"
+            "TCG: Software emulation — no hardware acceleration, very slow."
+        )
+        self.accel_desc.setStyleSheet(f"color: {T.TEXT_SECONDARY}; font-size: 11px; padding: 4px 0;")
+        self.accel_desc.setWordWrap(True)
+        accel_card.content_layout.addWidget(self.accel_desc)
+
+        # Warning when TCG selected
+        self.accel_warning = QLabel("")
+        self.accel_warning.setStyleSheet(
+            f"color: {T.WARNING}; font-size: 11px; background: {T.WARNING_BG};"
+            f" padding: 8px 12px; border-radius: 4px;"
+        )
+        self.accel_warning.setWordWrap(True)
+        self.accel_warning.hide()
+        accel_card.content_layout.addWidget(self.accel_warning)
+
+        self.accel_mode_combo.currentTextChanged.connect(self._on_accel_mode_changed)
+
+        accel_layout.addStretch()
+        self.tabs.addTab(accel_tab, "Acceleration")
+
         # ── Network Tab ─────────────────────────────────────────────────────────
         net_tab = QWidget()
         net_tab.setStyleSheet("background: #0f172a;")
@@ -443,6 +513,15 @@ class SettingsPanel(QWidget):
         log_layout.addStretch()
         self.tabs.addTab(log_tab, "Logging")
 
+        # ── Snapshot Scheduler Tab ───────────────────────────────────────────────
+        from gui.snapshot_scheduler import SnapshotScheduler, SnapshotSchedulerSettingsWidget
+
+        # Create a default scheduler for the settings panel
+        disk_path = self.disk_input.text().strip() or ""
+        self._snapshot_scheduler = SnapshotScheduler(disk_path=disk_path)
+        scheduler_settings_widget = SnapshotSchedulerSettingsWidget(self._snapshot_scheduler)
+        self.tabs.addTab(scheduler_settings_widget, "Snapshots")
+
         # ── Authentication Tab ─────────────────────────────────────────────────
         auth_tab = QWidget()
         auth_tab.setStyleSheet("background: #0f172a;")
@@ -566,6 +645,18 @@ class SettingsPanel(QWidget):
         self.status_label.setStyleSheet("color: #64748b; font-size: 12px;")
         layout.addWidget(self.status_label)
 
+    def _on_accel_mode_changed(self, mode: str):
+        """Handle acceleration mode change — show warning for TCG."""
+        if mode == "tcg":
+            self.accel_warning.setText(
+                "⚠️ TCG mode uses software emulation only. The VM will be extremely slow "
+                "(10-100x slower than hardware-accelerated). Only use for debugging or "
+                "when hardware virtualization is unavailable."
+            )
+            self.accel_warning.show()
+        else:
+            self.accel_warning.hide()
+
     def _load_from_env(self):
         """Reload all fields from the current .env file."""
         from pathlib import Path
@@ -595,6 +686,9 @@ class SettingsPanel(QWidget):
         self.display_combo.setCurrentText(settings.display.upper() if settings.display else "SDL")
         self.gl_check.setChecked(settings.gl)
         self.eject_check.setChecked(settings.auto_eject_iso)
+        accel_mode = getattr(settings, "vm_acceleration", "whpx").lower()
+        if accel_mode in ("whpx", "haxm", "tcg"):
+            self.accel_mode_combo.setCurrentText(accel_mode)
         self.ssh_host_input.setText(settings.ssh_host)
         self.ssh_port_spin.setValue(settings.ssh_port)
         self.guest_user_input.setText(settings.ssh_username)
@@ -674,6 +768,9 @@ class SettingsPanel(QWidget):
         settings["OPENGL"] = "1" if self.gl_check.isChecked() else "0"
         settings["AUTO_EJECT_ISO"] = "1" if self.eject_check.isChecked() else "0"
 
+        # Acceleration
+        settings["VM_ACCELERATION"] = self.accel_mode_combo.currentText()
+
         # Network
         settings["SSH_HOST"] = self.ssh_host_input.text()
         settings["SSH_PORT"] = str(ssh_port)
@@ -699,7 +796,7 @@ class SettingsPanel(QWidget):
             existing.update(settings)
 
             # Write back
-            lines = ["# QEMU-MCP Configuration — auto-saved from GUI"]
+            lines = ["# VM-Harness Configuration — auto-saved from GUI"]
             for key, val in sorted(existing.items()):
                 lines.append(f'{key}="{val}"')
             env_path.write_text("\n".join(lines) + "\n")
@@ -734,3 +831,7 @@ class SettingsPanel(QWidget):
         self.auth_method_combo.setCurrentText("api_key")
         self.status_label.setText("Settings reset to defaults")
         self.status_label.setStyleSheet("color: #f59e0b; font-size: 12px;")
+
+    def _save_json_settings(self):
+        """Persist the JSON-backed settings dict via settings_schema."""
+        save_settings(self._json_settings, self.JSON_SETTINGS_PATH)

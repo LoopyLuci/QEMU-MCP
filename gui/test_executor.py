@@ -63,7 +63,7 @@ class TestRunSummary:
 class MCPTestExecutor:
     """Execute MCP tests and collect results."""
 
-    def __init__(self, project_dir: str = "C:/Projects/QEMU-MCP"):
+    def __init__(self, project_dir: str = "C:/Projects/VM-Harness"):
         self._project_dir = Path(project_dir)
         self._venv_py = Path("/c/Users/Server/AppData/Local/hermes/hermes-agent/venv/Scripts/python.exe")
         self._results_dir = self._project_dir / "test-results"

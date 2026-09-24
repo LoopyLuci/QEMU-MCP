@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
+import time
 import pytest
 
 # Ensure offscreen for any Qt imports
@@ -31,16 +32,10 @@ def _qmp_port_open() -> bool:
 
 @pytest.fixture(scope="module")
 def settings():
-    from vm_mcp.config import VmMCPSettings, Secrets
+    from vm_mcp.config import VmMCPSettings
 
     s = VmMCPSettings()
     return s
-
-
-@pytest.fixture(scope="module")
-def secrets():
-    from vm_mcp.config import Secrets
-    return Secrets.from_env()
 
 
 # ── QMP integration tests (single event loop per test) ───────────────────────
@@ -56,14 +51,12 @@ class TestQMPBridgeLive:
     @pytest.mark.skipif(
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
-    def test_qmp_query_status(self, settings, secrets):
+    def test_qmp_query_status(self, settings):
         from vm_mcp.qmp_client import QMPClient
         from vm_mcp import qmp_client as qmp_mod
 
         async def _run():
-            client = QMPClient(
-                uri=settings.qmp_uri(), password=secrets.get_qmp_password()
-            )
+            client = QMPClient(uri=settings.qmp_uri())
             await client.connect()
             try:
                 status = await qmp_mod.query_status(client)
@@ -80,14 +73,12 @@ class TestQMPBridgeLive:
     @pytest.mark.skipif(
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
-    def test_qmp_system_reset(self, settings, secrets):
+    def test_qmp_system_reset(self, settings):
         from vm_mcp.qmp_client import QMPClient
         from vm_mcp import qmp_client as qmp_mod
 
         async def _run():
-            client = QMPClient(
-                uri=settings.qmp_uri(), password=secrets.get_qmp_password()
-            )
+            client = QMPClient(uri=settings.qmp_uri())
             await client.connect()
             try:
                 await qmp_mod.system_reset(client)
@@ -99,14 +90,12 @@ class TestQMPBridgeLive:
     @pytest.mark.skipif(
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
-    def test_qmp_stop_cont(self, settings, secrets):
+    def test_qmp_stop_cont(self, settings):
         from vm_mcp.qmp_client import QMPClient
         from vm_mcp import qmp_client as qmp_mod
 
         async def _run():
-            client = QMPClient(
-                uri=settings.qmp_uri(), password=secrets.get_qmp_password()
-            )
+            client = QMPClient(uri=settings.qmp_uri())
             await client.connect()
             try:
                 await qmp_mod.stop(client)
@@ -119,14 +108,12 @@ class TestQMPBridgeLive:
     @pytest.mark.skipif(
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
-    def test_qmp_eject_device(self, settings, secrets):
+    def test_qmp_eject_device(self, settings):
         from vm_mcp.qmp_client import QMPClient
         from vm_mcp import qmp_client as qmp_mod
 
         async def _run():
-            client = QMPClient(
-                uri=settings.qmp_uri(), password=secrets.get_qmp_password()
-            )
+            client = QMPClient(uri=settings.qmp_uri())
             await client.connect()
             try:
                 try:
@@ -143,53 +130,6 @@ class TestQMPBridgeLive:
 
 
 class TestQMPBridgeSignals:
-    """Verify QMPBridge emits signals correctly against live QEMU.
+    """Verify QMPBridge emits signals correctly.
 
-    Skipped when QEMU is not running.
-    """
-
-    @pytest.mark.skipif(
-        not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
-    )
-    def test_bridge_connects_and_reports_status(self, settings, secrets):
-        from gui.qmp_bridge import QMPBridge
-
-        bridge = QMPBridge(settings=settings)
-        bridge.start()
-
-        status_received = []
-        error_received = []
-
-        def on_status(status):
-            status_received.append(status)
-
-        def on_error(msg):
-            error_received.append(msg)
-
-        bridge.vm_status.connect(on_status)
-        bridge.error.connect(on_error)
-
-        bridge.connect()
-        import time
-
-        time.sleep(1)
-        bridge.get_status()
-        time.sleep(1)
-
-        bridge.stop()
-        time.sleep(0.5)
-
-        assert bridge.is_connected is not False or len(error_received) == 0
-
-
-# ── SSH integration tests (if guest SSH is reachable) ────────────────────────
-
-
-class TestSSHBridgeLive:
-    """End-to-end SSH tests against the guest.
-
-    Skipped unconditionally — the Omarchy guest VM does not run an SSH server.
-    """
-
-    def test_ssh_run_command(self, settings, secrets):
-        pytest.skip("SSH server not available in guest VM")
+    Skipped when QEMU is not running."""

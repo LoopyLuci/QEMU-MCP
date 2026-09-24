@@ -19,12 +19,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
-logger = logging.getLogger("qmcmcp.credentials")
+logger = logging.getLogger("vmharness.credentials")
 
 
 class Credential:
@@ -96,7 +96,7 @@ class CredentialStore:
             if os.getenv("XDG_DATA_HOME")
             else Path.home() / ".local" / "share"
         )
-        return data_dir / "qmcmcp" / "credentials.json"
+        return data_dir / "vmharness" / "credentials.json"
 
     def _ensure_fernet(self) -> None:
         """Initialize the Fernet cipher from the master password."""
@@ -123,7 +123,7 @@ class CredentialStore:
             return
 
         # Derive key from password using PBKDF2
-        salt = b"qmcmcp-salt-2026"  # Fixed salt — user should change in production
+        salt = b"vmharness-salt-2026"  # Fixed salt — user should change in production
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -210,7 +210,7 @@ class CredentialStore:
         entry = self._credentials[cid]
         try:
             decrypted = self._fernet.decrypt(entry["value"].encode()).decode()
-        except Exception:
+        except cryptography.fernet.Fernet.InvalidToken:
             decrypted = "[decryption failed]"
         return Credential(
             cid=cid,
@@ -251,7 +251,7 @@ class CredentialStore:
         for cid, entry in self._credentials.items():
             try:
                 decrypted = self._fernet.decrypt(entry["value"].encode()).decode()
-            except Exception:
+            except InvalidToken:
                 decrypted = "[decryption failed]"
             result.append(
                 Credential(

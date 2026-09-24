@@ -69,11 +69,18 @@ class VmMCPSettings(BaseSettings):
     vm_display: str = Field(default="sdl", description="QEMU display: sdl, gtk, none")
     vm_gl: bool = Field(default=True, description="Enable OpenGL in display")
 
+    # ── Hardware Acceleration ──────────────────────────────────────────────────
+
+    vm_acceleration: str = Field(
+        default="whpx",
+        description="Hardware acceleration mode: whpx, haxm, tcg (software)",
+    )
+
     # ── SSH (guest access) ─────────────────────────────────────────────────────
 
     ssh_host: str = Field(default="127.0.0.1", description="Guest SSH hostname")
     ssh_port: int = Field(default=22, description="Guest SSH port", ge=1, le=65535)
-    ssh_username: str = Field(default="OmarchyVM", description="Guest SSH username")
+    ssh_username: str = Field(default="vmharness", description="Guest SSH username")
     ssh_timeout_sec: int = Field(default=15, description="SSH timeout in seconds", ge=1)
     ssh_keepalive_sec: int = Field(default=30, description="SSH keepalive interval", ge=0)
     ssh_known_hosts: str | None = Field(default=None, description="Path to known_hosts")

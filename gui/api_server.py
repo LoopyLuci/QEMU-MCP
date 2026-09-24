@@ -1,4 +1,4 @@
-"""REST API Server — programmatic access to all QEMU-MCP operations."""
+"""REST API Server — programmatic access to all VM-Harness operations."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from vm_mcp.setup import QMPClient
 
 
 class QMCPAPIHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for QEMU-MCP REST API."""
+    """HTTP request handler for VM-Harness REST API."""
 
     def _send_json(self, data: Any, status: int = 200):
         """Send JSON response."""
@@ -148,7 +148,7 @@ class QMCPAPIHandler(BaseHTTPRequestHandler):
 
 
 class QMCPAPIServer:
-    """REST API server for QEMU-MCP."""
+    """REST API server for VM-Harness."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8080):
         self._host = host

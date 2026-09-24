@@ -308,8 +308,20 @@ class TestCredentialStore:
 class TestMainWindow:
     """Verify MainWindow constructs with all panels and bridges."""
 
-    def test_main_window_constructs(self, qtbot, app):
-        """MainWindow assembles with 7 panels and both bridges."""
+    def test_main_window_constructs(self, qtbot, app, monkeypatch):
+        """MainWindow assembles with bridges. Uses mocked config so no real QEMU/SSH."""
+        import os
+        tmp = os.environ.get("TEST_TMP_DIR")
+        if tmp and os.path.isdir(tmp):
+            from pathlib import Path
+            monkeypatch.setenv("QEMU_BINARY", str(Path(tmp) / "qemu.exe"))
+            monkeypatch.setenv("VM_DISK_PATH", str(Path(tmp) / "disk.qcow2"))
+            monkeypatch.setenv("SSH_HOST", "127.0.0.1")
+            monkeypatch.setenv("QMP_HOST", "127.0.0.1")
+            monkeypatch.setenv("QMP_PORT", "5555")
+            # Override SSH password so SSHBridge authenticates with mock creds
+            monkeypatch.setenv("SSH_PASSWORD", "mock-pass")
+
         from gui.main_window import MainWindow
 
         win = MainWindow()
@@ -345,3 +357,191 @@ class TestBridges:
         bridge = SSHBridge(settings=settings)
         assert bridge is not None
         assert bridge._settings is settings
+
+
+# ── Hardware Acceleration tests ──────────────────────────────────────────────
+
+
+class TestHardwareAcceleration:
+    """Verify Hardware Acceleration toggle, status, settings, and persistence."""
+
+    def test_vm_control_has_accel_checkbox(self, qtbot, app):
+        """VM Control panel exposes a WHPX acceleration checkbox."""
+        from gui.panels_vm_control import VMControlPanel
+
+        panel = VMControlPanel()
+        assert panel is not None
+        assert panel._accel_check is not None
+        assert panel._accel_check.text() == "Enable WHPX Acceleration"
+        # Default state: enabled (checked)
+        assert panel._accel_check.isChecked() is True
+        qtbot.addWidget(panel)
+
+    def test_vm_control_accel_status_indicator(self, qtbot, app):
+        """VM Control panel shows a status indicator for acceleration."""
+        from gui.panels_vm_control import VMControlPanel
+
+        panel = VMControlPanel()
+        assert panel._accel_status is not None
+        assert panel._accel_status_label is not None
+        # Default: WHPX Active
+        assert panel._accel_status_label.text() == "WHPX Active"
+        qtbot.addWidget(panel)
+
+    def test_vm_control_accel_toggle_updates_status(self, qtbot, app):
+        """Toggling acceleration checkbox updates status label and indicator."""
+        from gui.panels_vm_control import VMControlPanel
+
+        panel = VMControlPanel()
+        qtbot.addWidget(panel)
+
+        # Initially enabled
+        assert panel._accel_status_label.text() == "WHPX Active"
+
+        # Disable acceleration
+        panel._accel_check.setChecked(False)
+        assert panel._accel_status_label.text() == "TCG (Software) — Slow"
+        # Warning should be not hidden (visible property depends on parent visibility)
+        assert not panel._accel_warning.isHidden()
+        assert "Hardware acceleration disabled" in panel._accel_warning.text()
+
+        # Re-enable acceleration
+        panel._accel_check.setChecked(True)
+        assert panel._accel_status_label.text() == "WHPX Active"
+        assert panel._accel_warning.isHidden()
+
+    def test_vm_control_accel_warning_text(self, qtbot, app):
+        """Warning message mentions TCG mode and performance impact."""
+        from gui.panels_vm_control import VMControlPanel
+
+        panel = VMControlPanel()
+        qtbot.addWidget(panel)
+
+        panel._accel_check.setChecked(False)
+        warning_text = panel._accel_warning.text()
+        assert "TCG" in warning_text
+        assert "slower" in warning_text.lower() or "significantly slower" in warning_text.lower()
+
+    def test_settings_has_accel_mode_combo(self, qtbot, app, monkeypatch, tmp_path):
+        """Settings panel has an acceleration mode combo box."""
+        from gui.panels_settings import SettingsPanel
+
+        store_dir = tmp_path / "qcmcp"
+        store_dir.mkdir()
+        cred_path = store_dir / "credentials.json"
+        master_key_path = store_dir / ".master_key"
+        monkeypatch.setenv("GUI_STORE_PATH", str(cred_path))
+        monkeypatch.setenv("GUI_MASTER_KEY_PATH", str(master_key_path))
+        monkeypatch.setenv("GUI_MASTER_PASSWORD", "test-secret-123")
+
+        panel = SettingsPanel()
+        assert panel.accel_mode_combo is not None
+        # Verify all three modes are available
+        items = [panel.accel_mode_combo.itemText(i) for i in range(panel.accel_mode_combo.count())]
+        assert "whpx" in items
+        assert "haxm" in items
+        assert "tcg" in items
+        qtbot.addWidget(panel)
+
+    def test_settings_tcg_shows_warning(self, qtbot, app, monkeypatch, tmp_path):
+        """Selecting TCG mode in settings shows a warning."""
+        from gui.panels_settings import SettingsPanel
+
+        store_dir = tmp_path / "qcmcp"
+        store_dir.mkdir()
+        cred_path = store_dir / "credentials.json"
+        master_key_path = store_dir / ".master_key"
+        monkeypatch.setenv("GUI_STORE_PATH", str(cred_path))
+        monkeypatch.setenv("GUI_MASTER_KEY_PATH", str(master_key_path))
+        monkeypatch.setenv("GUI_MASTER_PASSWORD", "test-secret-123")
+
+        panel = SettingsPanel()
+        qtbot.addWidget(panel)
+
+        # Initially no warning (whpx is default)
+        assert panel.accel_warning.isHidden()
+
+        # Select TCG
+        panel.accel_mode_combo.setCurrentText("tcg")
+        assert not panel.accel_warning.isHidden()
+        assert "software emulation" in panel.accel_warning.text().lower() or "extremely slow" in panel.accel_warning.text().lower()
+
+        # Switch back to whpx — warning hides
+        panel.accel_mode_combo.setCurrentText("whpx")
+        assert panel.accel_warning.isHidden()
+
+    def test_settings_haxm_no_warning(self, qtbot, app, monkeypatch, tmp_path):
+        """Selecting HAXM mode does not show a warning."""
+        from gui.panels_settings import SettingsPanel
+
+        store_dir = tmp_path / "qcmcp"
+        store_dir.mkdir()
+        cred_path = store_dir / "credentials.json"
+        master_key_path = store_dir / ".master_key"
+        monkeypatch.setenv("GUI_STORE_PATH", str(cred_path))
+        monkeypatch.setenv("GUI_MASTER_KEY_PATH", str(master_key_path))
+        monkeypatch.setenv("GUI_MASTER_PASSWORD", "test-secret-123")
+
+        panel = SettingsPanel()
+        qtbot.addWidget(panel)
+
+        panel.accel_mode_combo.setCurrentText("haxm")
+        assert panel.accel_warning.isHidden()
+
+    def test_config_acceleration_persistence(self, monkeypatch):
+        """vm_acceleration setting persists through env var."""
+        from vm_mcp.config import VmMCPSettings
+
+        # Set env var before creating settings
+        monkeypatch.setenv("VM_ACCELERATION", "haxm")
+        settings = VmMCPSettings()
+        assert settings.vm_acceleration == "haxm"
+
+    def test_config_acceleration_default(self):
+        """Default acceleration mode is whpx."""
+        from vm_mcp.config import VmMCPSettings
+
+        settings = VmMCPSettings()
+        assert settings.vm_acceleration == "whpx"
+
+    def test_settings_save_accel_value(self, qtbot, app, monkeypatch, tmp_path):
+        """Settings panel combo reflects the selected acceleration mode."""
+        from gui.panels_settings import SettingsPanel
+
+        store_dir = tmp_path / "qcmcp"
+        store_dir.mkdir()
+        cred_path = store_dir / "credentials.json"
+        master_key_path = store_dir / ".master_key"
+        monkeypatch.setenv("GUI_STORE_PATH", str(cred_path))
+        monkeypatch.setenv("GUI_MASTER_KEY_PATH", str(master_key_path))
+        monkeypatch.setenv("GUI_MASTER_PASSWORD", "test-secret-123")
+
+        panel = SettingsPanel()
+        qtbot.addWidget(panel)
+
+        # Change acceleration to haxm and verify combo reflects it
+        panel.accel_mode_combo.setCurrentText("haxm")
+        assert panel.accel_mode_combo.currentText() == "haxm"
+
+        # Change to tcg and verify
+        panel.accel_mode_combo.setCurrentText("tcg")
+        assert panel.accel_mode_combo.currentText() == "tcg"
+        # Warning text should be set (isVisible depends on parent being shown)
+        assert "software emulation" in panel.accel_warning.text().lower() or "extremely slow" in panel.accel_warning.text().lower()
+        assert not panel.accel_warning.isHidden()
+
+        # Change back to whpx
+        panel.accel_mode_combo.setCurrentText("whpx")
+        assert panel.accel_warning.isHidden()
+
+    def test_accel_checkbox_uses_accent_color(self, qtbot, app):
+        """Accent color is applied to the checkbox indicator when checked."""
+        from gui.panels_vm_control import VMControlPanel
+        from gui.theme import T
+
+        panel = VMControlPanel()
+        qtbot.addWidget(panel)
+
+        # The checkbox stylesheet should reference T.ACCENT
+        stylesheet = panel._accel_check.styleSheet()
+        assert T.ACCENT in stylesheet

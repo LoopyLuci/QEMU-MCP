@@ -34,7 +34,7 @@ class AtomicState:
             if self._state_file.exists():
                 with open(self._state_file, 'r') as f:
                     self._state = json.load(f)
-        except Exception:
+        except json.JSONDecodeError:
             self._state = {}
 
         # Replay WAL if it exists (crash recovery)
@@ -47,8 +47,8 @@ class AtomicState:
                             entry = json.loads(line)
                             self._state.update(entry)
                 self._commit()
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError):
+                pass  # Corrupt WAL — best-effort recovery
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a state value."""
@@ -89,8 +89,8 @@ class AtomicState:
             # Truncate WAL after successful commit
             if self._wal_file.exists():
                 self._wal_file.write_text('')
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError):
+            pass  # Best-effort — state may be stale but app keeps running
 
     def create_snapshot(self, name: str = "latest") -> Path:
         """Create a named snapshot of current state."""
@@ -111,7 +111,7 @@ class AtomicState:
                 self._state = json.load(f)
             self._commit()
             return True
-        except Exception:
+        except (json.JSONDecodeError, OSError):
             return False
 
     def list_snapshots(self) -> list[str]:

@@ -41,7 +41,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-name")
             return result.get("return", {}).get("name", "unknown")
-        except Exception:
+        except (OSError, TimeoutError):
             return "unknown"
 
     async def get_uuid(self) -> str:
@@ -49,7 +49,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-uuid")
             return result.get("return", {}).get("UUID", "")
-        except Exception:
+        except (OSError, TimeoutError):
             return ""
 
     async def get_cpus(self) -> list[dict]:
@@ -57,7 +57,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-cpus")
             return result.get("return", [])
-        except Exception:
+        except (OSError, TimeoutError):
             return []
 
     async def get_memory(self) -> dict[str, Any]:
@@ -65,7 +65,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-memory")
             return result.get("return", {})
-        except Exception:
+        except (OSError, TimeoutError):
             return {}
 
     async def get_balloon(self) -> dict[str, Any]:
@@ -73,7 +73,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-balloon")
             return result.get("return", {})
-        except Exception:
+        except (OSError, TimeoutError):
             return {}
 
     async def get_version(self) -> dict[str, Any]:
@@ -81,7 +81,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-version")
             return result.get("return", {})
-        except Exception:
+        except (OSError, TimeoutError, json.JSONDecodeError):
             return {}
 
     async def get_kvm(self) -> bool:
@@ -89,7 +89,7 @@ class QMPExtractor:
         try:
             result = await self._send("query-kvm")
             return result.get("return", {}).get("enabled", False)
-        except Exception:
+        except (OSError, TimeoutError, json.JSONDecodeError):
             return False
 
     async def get_all(self) -> dict[str, Any]:

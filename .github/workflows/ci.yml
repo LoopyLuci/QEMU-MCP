@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv venv
+          venv\Scripts\python.exe -m pip install --upgrade pip
+          venv\Scripts\pip.exe install -r requirements.txt
+
+      - name: Run unit tests
+        run: venv\Scripts\python.exe -m unittest tests.test_integrations tests.test_all_panels
+
+      - name: Syntax check all Python files
+        run: |
+          venv\Scripts\python.exe -m compileall -q .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: PyInstaller spec validation
+        run: |
+          venv\Scripts\pip.exe install pyinstaller
+          venv\Scripts\python.exe -m py_compile vm-harness.spec
+          Write-Host "PyInstaller spec is valid"

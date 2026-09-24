@@ -210,8 +210,8 @@ class DashboardPanel(QWidget):
                         pid = parts[1].strip('"')
                         self._vm_pid = pid
                         self._stat_labels["PID"].setText(pid)
-        except Exception:
-            pass
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            pass  # tasklist failed — VM info unavailable
 
     def _on_connected(self, connected: bool):
         """Handle QMP connect/disconnect."""
@@ -224,19 +224,37 @@ class DashboardPanel(QWidget):
         pass
 
     def _on_start_vm(self):
-        """Start VM via QMP bridge."""
-        if self._qmp_bridge:
-            self._qmp_bridge.cont()
-            self.add_activity("VM start requested")
+        """Start VM via REST API."""
+        import urllib.request
+        import json as _json
+        try:
+            req = urllib.request.Request(
+                "http://127.0.0.1:8443/api/v1/vms/test/start",
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read())
+                self.add_activity(f"VM start: {data.get('detail', 'ok')}")
+        except Exception as e:
+            self.add_activity(f"VM start failed: {e}")
 
     def _on_stop_vm(self):
-        """Stop VM via QMP bridge."""
-        if self._qmp_bridge:
-            self._qmp_bridge.system_powerdown()
-            self.add_activity("VM stop requested")
+        """Stop VM via REST API."""
+        import urllib.request
+        import json as _json
+        try:
+            req = urllib.request.Request(
+                "http://127.0.0.1:8443/api/v1/vms/test/stop",
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read())
+                self.add_activity(f"VM stop: {data.get('detail', 'ok')}")
+        except Exception as e:
+            self.add_activity(f"VM stop failed: {e}")
 
     def _on_reset_vm(self):
-        """Reset VM via QMP bridge."""
+        """Reset VM via QMP bridge (requires running VM)."""
         if self._qmp_bridge:
             self._qmp_bridge.system_reset()
             self.add_activity("VM reset requested")

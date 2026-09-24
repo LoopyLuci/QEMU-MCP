@@ -81,7 +81,7 @@ class ProcessGuardian:
         """Start the primary GUI process."""
         try:
             env = os.environ.copy()
-            env["QEMU_MCP_ROLE"] = "primary"
+            env["VM_HARNESS_ROLE"] = "primary"
             self._primary_process = subprocess.Popen(
                 [sys.executable, self._main_script],
                 env=env,
@@ -97,8 +97,8 @@ class ProcessGuardian:
         for i in range(self._backup_count):
             try:
                 env = os.environ.copy()
-                env["QEMU_MCP_ROLE"] = "backup"
-                env["QEMU_MCP_BACKUP_ID"] = str(i)
+                env["VM_HARNESS_ROLE"] = "backup"
+                env["VM_HARNESS_BACKUP_ID"] = str(i)
                 backup = subprocess.Popen(
                     [sys.executable, self._main_script, "--standby"],
                     env=env,
@@ -107,7 +107,7 @@ class ProcessGuardian:
                 )
                 self._backup_processes.append(backup)
                 logger.info("Backup %d started (PID %d)", i, backup.pid)
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 logger.error("Failed to start backup %d: %s", i, e)
 
     def _kill_primary(self):
@@ -116,7 +116,7 @@ class ProcessGuardian:
             try:
                 self._primary_process.terminate()
                 self._primary_process.wait(timeout=5)
-            except Exception:
+            except (ProcessLookupError, subprocess.TimeoutExpired):
                 self._primary_process.kill()
             self._primary_process = None
 
@@ -126,7 +126,7 @@ class ProcessGuardian:
             try:
                 backup.terminate()
                 backup.wait(timeout=3)
-            except Exception:
+            except (subprocess.TimeoutExpired, ProcessLookupError):
                 backup.kill()
         self._backup_processes.clear()
 
@@ -156,7 +156,7 @@ class ProcessGuardian:
         if self._on_crash:
             try:
                 self._on_crash()
-            except Exception:
+            except (RuntimeError, OSError):
                 pass
 
         if not self._should_restart():
@@ -174,7 +174,7 @@ class ProcessGuardian:
         if self._on_restart:
             try:
                 self._on_restart()
-            except Exception:
+            except (RuntimeError, OSError):
                 pass
 
     def _promote_backup(self):
@@ -188,8 +188,8 @@ class ProcessGuardian:
         # Start a new backup to replace the promoted one
         try:
             env = os.environ.copy()
-            env["QEMU_MCP_ROLE"] = "backup"
-            env["QEMU_MCP_BACKUP_ID"] = str(len(self._backup_processes))
+            env["VM_HARNESS_ROLE"] = "backup"
+            env["VM_HARNESS_BACKUP_ID"] = str(len(self._backup_processes))
             new_backup = subprocess.Popen(
                 [sys.executable, self._main_script, "--standby"],
                 env=env,

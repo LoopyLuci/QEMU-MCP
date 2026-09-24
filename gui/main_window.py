@@ -1,4 +1,4 @@
-"""Main Window for QEMU-MCP GUI.
+"""Main Window for VM-Harness GUI.
 
 Frameless window with custom title bar, sidebar navigation,
 panel content area, and status bar.  Provides the overall
@@ -14,7 +14,7 @@ import pathlib
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QSize, QTimer, QRect, QPoint, pyqtSignal
-from PyQt5.QtGui import QIcon, QPalette, QColor, QPainter, QFont
+from PyQt5.QtGui import QIcon, QPalette, QColor, QPainter, QFont, QPixmap, QBitmap, QPainterPath
 from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -28,6 +28,9 @@ from PyQt5.QtWidgets import (
     QSpacerItem,
     QSizePolicy,
     QMessageBox,
+    QSystemTrayIcon,
+    QMenu,
+    QAction,
 )
 
 # Ensure project root and src are on path
@@ -70,7 +73,8 @@ class TitleBar(QWidget):
     def __init__(self, parent: QMainWindow):
         super().__init__(parent)
         self._parent = parent
-        self.setFixedHeight(40)
+        self.setMinimumHeight(36)
+        self.setMaximumHeight(48)
         self.setStyleSheet(title_bar_style())
         layout = QHBoxLayout(self)
         layout.setContentsMargins(T.SM, 0, T.SM, 0)
@@ -78,7 +82,8 @@ class TitleBar(QWidget):
 
         # Brand icon
         icon_label = QLabel()
-        icon_label.setFixedSize(T.FS_XL + 4, T.FS_XL + 4)
+        icon_label.setMinimumSize(24, 24)
+        icon_label.setMaximumSize(36, 36)
         icon_label.setStyleSheet(
             "background: " + T.BRAND + ";"
             "border-radius: " + str(T.R_SM) + "px;"
@@ -87,13 +92,14 @@ class TitleBar(QWidget):
         layout.addWidget(icon_label)
 
         # App name
-        title_label = QLabel("QEMU-MCP")
+        title_label = QLabel("VM-Harness")
         title_label.setStyleSheet(
             "color: " + T.TEXT_PRIMARY + ";"
             "font-size: " + str(T.FS_LG) + "px; "
             "font-weight: bold;"
         )
-        title_label.setFixedHeight(24)
+        title_label.setMinimumHeight(20)
+        title_label.setMaximumHeight(32)
         layout.addWidget(title_label)
 
         layout.addStretch()
@@ -113,21 +119,24 @@ class TitleBar(QWidget):
 
         # Window controls
         self._btn_min = QPushButton("\u2014")
-        self._btn_min.setFixedSize(T.MD * 3, T.LG * 2)
+        self._btn_min.setMinimumSize(36, 24)
+        self._btn_min.setMaximumSize(48, 32)
         self._btn_min.setCursor(Qt.PointingHandCursor)
         self._btn_min.setStyleSheet(button_ghost_style())
         self._btn_min.clicked.connect(lambda: self._parent.showMinimized())
         layout.addWidget(self._btn_min)
 
         self._btn_max = QPushButton("\u25A1")
-        self._btn_max.setFixedSize(T.MD * 3, T.LG * 2)
+        self._btn_max.setMinimumSize(36, 24)
+        self._btn_max.setMaximumSize(48, 32)
         self._btn_max.setCursor(Qt.PointingHandCursor)
         self._btn_max.setStyleSheet(button_ghost_style())
         self._btn_max.clicked.connect(self._toggle_maximize)
         layout.addWidget(self._btn_max)
 
         self._btn_close = QPushButton("\u2715")
-        self._btn_close.setFixedSize(T.MD * 3, T.LG * 2)
+        self._btn_close.setMinimumSize(36, 24)
+        self._btn_close.setMaximumSize(48, 32)
         self._btn_close.setCursor(Qt.PointingHandCursor)
         self._btn_close.setStyleSheet(button_red_style())
         self._btn_close.clicked.connect(self._parent.close)
@@ -178,18 +187,27 @@ class Sidebar(QWidget):
         ("USB/Devices", "🔌", "usb"),
         ("Network", "🌐", "network"),
         ("Monitoring", "📊", "monitoring"),
+        ("Containers", "🐳", "containers"),
+        ("Container Terminal", "⌨️", "container_terminal"),
+        ("Container Stats", "📈", "container_stats"),
+        ("K8s Editor", "☸️", "k8s_editor"),
+        ("K8s Tree", "🌳", "k8s_tree"),
+        ("VM Console", "🖥️", "vm_console"),
+        ("VMware/VBox", "🖥️", "vmware_vbox"),
         ("Settings", "⚙️", "settings"),
         ("Security", "🔒", "security"),
         ("Automation", "🤖", "automation"),
         ("Troubleshoot", "🔍", "troubleshoot"),
         ("AI Chat", "💬", "chat"),
         ("AI Providers", "🤖", "providers"),
+        ("Pairing", "🔗", "pairing"),
     ]
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._current = "dashboard"
-        self.setFixedWidth(180)
+        self.setMinimumWidth(160)
+        self.setMaximumWidth(280)
         self.setStyleSheet("""
             Sidebar {
                 background: #0f172a;
@@ -205,7 +223,8 @@ class Sidebar(QWidget):
             btn.setObjectName(f"sidebar_{name}")
             btn.setCursor(Qt.PointingHandCursor)
             btn.setCheckable(True)
-            btn.setFixedHeight(40)
+            btn.setMinimumHeight(36)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent;
@@ -234,7 +253,7 @@ class Sidebar(QWidget):
         layout.addStretch()
 
         # Version label
-        ver_label = QLabel("v1.0.0")
+        ver_label = QLabel("v2.0.0")
         ver_label.setStyleSheet("color: #475569; font-size: 10px; text-align: center;")
         ver_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ver_label)
@@ -251,14 +270,25 @@ class Sidebar(QWidget):
 # ── Main Window ─────────────────────────────────────────────────────────────────
 
 class MainWindow(QMainWindow):
-    """QEMU-MCP main application window."""
+    """VM-Harness main application window."""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("QEMU-MCP")
-        self.setMinimumSize(1200, 800)
+        self.setWindowTitle("VM-Harness")
+        self.setMinimumSize(1024, 640)
         self.resize(1400, 900)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
+        # Set native resize behavior for frameless window
+        self.setWindowFlags(
+            Qt.FramelessWindowHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowCloseButtonHint
+            | Qt.CustomizeWindowHint
+        )
+        # Allow native resize from OS-level (drag via grips + native borders)
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        self.setAttribute(Qt.WA_NoSystemBackground, False)
+        self.setMouseTracking(True)
         self.setStyleSheet("""
             QMainWindow {
                 background: #0f172a;
@@ -276,6 +306,9 @@ class MainWindow(QMainWindow):
         self.credential_store = CredentialStore()
 
         self._drag_pos: QPoint = QPoint()
+
+        # ── System Tray ──────────────────────────────────────────────────────
+        self._setup_system_tray()
 
         # ── Central widget ─────────────────────────────────────────────────────
         central = QWidget()
@@ -348,6 +381,14 @@ class MainWindow(QMainWindow):
         # ── Build panels ───────────────────────────────────────────────────────
         self._build_panels()
 
+        # ── API server for pairing ─────────────────────────────────────────────
+        self._api_server = None
+        self._init_api_server()
+
+        # ── Wire pairing panel to API server ──────────────────────────────────
+        if "pairing" in self.panels and self._api_server:
+            self.panels["pairing"].set_server(self._api_server)
+
         # ── Sidebar connection ─────────────────────────────────────────────────
         self.sidebar.current_panel_changed.connect(self._switch_panel)
 
@@ -367,6 +408,131 @@ class MainWindow(QMainWindow):
 
         # ── Build panels ───────────────────────────────────────────────────────
         self._update_status_indicators()
+
+        # ── DPI scaling ────────────────────────────────────────────────────────
+        self._apply_dpi_scaling()
+
+        # ── Resize grips ───────────────────────────────────────────────────────
+        self._setup_resize_grips()
+
+    def _init_api_server(self):
+        """Initialize API server for pairing token generation."""
+        try:
+            from pathlib import Path
+            from vm_mcp.api_server import QMCMApiServer, _load_or_generate_signing_key
+
+            # Signing key is at PROJECT_ROOT/.vmharness_signing_key
+            key_dir = Path(".")
+            signing_key = _load_or_generate_signing_key(key_dir)
+            self._api_server = QMCMApiServer(
+                host="0.0.0.0",
+                port=8443,
+                tailscale_only=False,
+                signing_key_dir=key_dir,
+            )
+        except Exception as e:
+            # Non-fatal: pairing panel will show error
+            import logging
+            logging.getLogger("vmharness.gui").warning(f"API server init failed: {e}")
+
+    # ── System Tray ──────────────────────────────────────────────────────────
+
+    def _setup_system_tray(self):
+        """Create system tray icon and context menu."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray_icon = None
+            return
+
+        # Create tray icon
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setToolTip("VM-Harness — Running")
+
+        # Create icon programmatically (purple circle with "V")
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QColor("#7c3aed"))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(4, 4, 56, 56)
+        painter.setPen(QColor("#ffffff"))
+        painter.setFont(QFont("Arial", 28, QFont.Bold))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, "V")
+        painter.end()
+        self.tray_icon.setIcon(QIcon(pixmap))
+
+        # Create context menu
+        tray_menu = QMenu()
+        action_restore = QAction("Show VM-Harness", self)
+        action_restore.triggered.connect(self._restore_from_tray)
+        tray_menu.addAction(action_restore)
+        tray_menu.addSeparator()
+        action_quit = QAction("Quit", self)
+        action_quit.triggered.connect(self._quit_from_tray)
+        tray_menu.addAction(action_quit)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self._tray_activated)
+        self.tray_icon.messageClicked.connect(self._restore_from_tray)
+        self.tray_icon.show()
+
+    def _restore_from_tray(self):
+        """Restore window from system tray — ensure taskbar entry returns."""
+        # Remove Tool flag so window appears in taskbar again
+        flags = (self.windowFlags() & ~Qt.Tool) | Qt.Window | Qt.CustomizeWindowHint
+        self.setWindowFlags(flags)
+        self.showNormal()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self):
+        """Quit from tray — properly clean up."""
+        self._save_state()
+        if self.tray_icon:
+            self.tray_icon.hide()
+        # Stop timers but don't stop bridges — they should keep running
+        # for the headless server
+        self._telemetry_timer.stop()
+        self._reconnect_timer.stop()
+        QApplication.quit()
+
+    def _tray_activated(self, reason):
+        """Handle tray icon click — restore on double click."""
+        if reason == QSystemTrayIcon.DoubleClick:
+            self._restore_from_tray()
+        elif reason == QSystemTrayIcon.Trigger:
+            # Single click also restores
+            self._restore_from_tray()
+
+    def closeEvent(self, event):
+        """Clean up on close — minimize to tray with NO taskbar icon."""
+        # Save window state for next launch
+        self._save_state()
+        # Release resize grips
+        if hasattr(self, '_grips'):
+            for grip in self._grips:
+                grip.releaseMouse()
+                grip.deleteLater()
+            self._grips.clear()
+        # Minimize to tray — remove from taskbar entirely
+        if self.tray_icon and self.tray_icon.isVisible():
+            event.ignore()
+            # Use setWindowFlags + hide to suppress taskbar entry
+            self.setWindowFlags(self.windowFlags() | Qt.Tool)
+            self.show()
+            self.hide()
+            # Restore flags for when user restores
+            flags = (self.windowFlags() & ~Qt.Tool)
+            self.setWindowFlags(flags | Qt.Window | Qt.CustomizeWindowHint)
+            self.tray_icon.showMessage(
+                "VM-Harness",
+                "Minimized to tray. No taskbar icon. Right-click tray icon to restore.",
+                QSystemTrayIcon.Information,
+                3000,
+            )
+        else:
+            event.accept()
 
     def _title_bar_mouse_press(self, event):
         if event.button() == Qt.LeftButton:
@@ -401,8 +567,16 @@ class MainWindow(QMainWindow):
         from gui.panels_chat import ChatPanel
         from gui.panels_providers import AIProvidersPanel
         from gui.panels_settings import SettingsPanel
+        from gui.panels_pairing import PairingPanel
         from gui.panels_security import SecurityPanel
         from gui.panels_logs import LogsPanel
+        from gui.panels_container import ContainerPanel
+        from gui.panels_container_terminal import ContainerTerminalPanel
+        from gui.panels_container_stats import ContainerStatsPanel
+        from gui.panels_k8s_editor import KubernetesEditorPanel
+        from gui.panels_k8s_tree import KubernetesTreePanel
+        from gui.panels_vm_console import VMConsolePanel
+        from gui.vmware_vbox_panel import VMwareVBoxPanel
 
         self.panels: dict[str, QWidget] = {}
 
@@ -430,8 +604,16 @@ class MainWindow(QMainWindow):
             (AIProvidersPanel, "providers"),
             (MonitoringPanel, "monitoring"),
             (SettingsPanel, "settings"),
+            (PairingPanel, "pairing"),
             (SecurityPanel, "security"),
             (LogsPanel, "logs"),
+            (ContainerPanel, "containers"),
+            (ContainerTerminalPanel, "container_terminal"),
+            (ContainerStatsPanel, "container_stats"),
+            (KubernetesEditorPanel, "k8s_editor"),
+            (KubernetesTreePanel, "k8s_tree"),
+            (VMConsolePanel, "vm_console"),
+            (VMwareVBoxPanel, "vmware_vbox"),
         ]
 
         for panel_cls, name in panel_list:
@@ -443,7 +625,7 @@ class MainWindow(QMainWindow):
         if "dashboard" in self.panels:
             self.panels["dashboard"].set_qmp_bridge(self.qmp_bridge)
         if "vm_control" in self.panels:
-            self.panels["vm_control"].set_qmp_bridge(self.qmp_bridge)
+            self.panels["vm_control"].set_multi_qmp_bridge(self.qmp_bridge)
         if "guest_terminal" in self.panels:
             self.panels["guest_terminal"].set_ssh_bridge(self.ssh_bridge)
         if "guest_agent" in self.panels:
@@ -461,6 +643,138 @@ class MainWindow(QMainWindow):
         if name in self.panels:
             self.panel_stack.setCurrentWidget(self.panels[name])
             self.status_label.setText(f"Panel: {name.replace('_', ' ').title()}")
+
+    def _apply_dpi_scaling(self):
+        """Apply DPI-aware scaling to all child widgets."""
+        from PyQt5.QtCore import Qt
+        from PyQt5.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if not app:
+            return
+
+        # Get primary screen DPI
+        screen = app.primaryScreen()
+        if not screen:
+            return
+
+        dpi = screen.logicalDotsPerInch()
+        scale = dpi / 96.0  # 96 DPI is the reference
+
+        # Clamp to reasonable range
+        scale = max(0.8, min(scale, 2.0))
+
+        # Apply to all child widgets
+        for widget in self.findChildren(QWidget):
+            # Scale font sizes
+            font = widget.font()
+            base_size = font.pointSizeF()
+            if base_size > 0:
+                font.setPointSizeF(base_size * scale)
+                widget.setFont(font)
+
+            # Scale icons
+            if hasattr(widget, 'iconSize') and hasattr(widget, 'setIconSize'):
+                current = widget.iconSize()
+                if hasattr(current, 'width') and hasattr(current, 'height'):
+                    from PyQt5.QtCore import QSize
+                    widget.setIconSize(QSize(int(current.width() * scale), int(current.height() * scale)))
+
+    def resizeEvent(self, event):
+        """Handle window resize events."""
+        super().resizeEvent(event)
+        self._apply_dpi_scaling()
+        self._update_grips()
+
+    def _update_grips(self):
+        """Reposition resize grips when window is resized."""
+        if not hasattr(self, '_grips') or len(self._grips) < 8:
+            return
+        w, h = self.width(), self.height()
+        g = 20  # grip size
+        # Order: top-left, top-right, bottom-left, bottom-right,
+        #        top-center, bottom-center, left-center, right-center
+        positions = [
+            (0, 0),
+            (w - g, 0),
+            (0, h - g),
+            (w - g, h - g),
+            (w // 2 - g // 2, 0),
+            (w // 2 - g // 2, h - g),
+            (0, h // 2 - g // 2),
+            (w - g, h // 2 - g // 2),
+        ]
+        for grip, (x, y) in zip(self._grips[:8], positions):
+            grip.setGeometry(x, y, g, g)
+            grip.raise_()  # Keep grips above content
+
+    def _setup_resize_grips(self):
+        """Add invisible resize grip widgets at corners and edges."""
+        self._grips = []
+        grip_size = 20
+        edges = [
+            (0, 0, grip_size, grip_size),                          # top-left
+            (self.width() - grip_size, 0, grip_size, grip_size),   # top-right
+            (0, self.height() - grip_size, grip_size, grip_size),   # bottom-left
+            (self.width() - grip_size, self.height() - grip_size, grip_size, grip_size),  # bottom-right
+            (self.width() // 2 - grip_size // 2, 0, grip_size, grip_size),   # top-center
+            (self.width() // 2 - grip_size // 2, self.height() - grip_size, grip_size, grip_size),  # bottom-center
+            (0, self.height() // 2 - grip_size // 2, grip_size, grip_size),   # left-center
+            (self.width() - grip_size, self.height() // 2 - grip_size // 2, grip_size, grip_size),  # right-center
+        ]
+        cursors = [
+            Qt.SizeFDiagCursor, Qt.SizeFDiagCursor,
+            Qt.SizeFDiagCursor, Qt.SizeFDiagCursor,
+            Qt.SizeVerCursor, Qt.SizeVerCursor,
+            Qt.SizeHorCursor, Qt.SizeHorCursor,
+        ]
+        for i, (x, y, w, h) in enumerate(edges):
+            grip = QWidget(self)
+            grip.setGeometry(x, y, w, h)
+            grip.setStyleSheet("background: transparent;")
+            grip.setCursor(cursors[i])
+            grip.mousePressEvent = lambda e, g=grip, idx=i: self._grip_press(e, g, idx)
+            grip.mouseMoveEvent = lambda e, g=grip, idx=i: self._grip_move(e, g, idx)
+            grip.mouseReleaseEvent = lambda e, g=grip: self._grip_release(e, g)
+            self._grips.append(grip)
+
+    def _grip_press(self, event, grip, edge_idx):
+        if event.button() == Qt.LeftButton:
+            self._grip_start_pos = event.globalPos()
+            self._grip_start_geometry = self.geometry()
+            self._grip_edge_idx = edge_idx
+            grip.grabMouse()
+
+    def _grip_move(self, event, grip, edge_idx):
+        if not hasattr(self, '_grip_start_pos') or self._grip_edge_idx != edge_idx:
+            return
+        delta = event.globalPos() - self._grip_start_pos
+        geom = self._grip_start_geometry
+
+        new_x, new_y, new_w, new_h = geom.x(), geom.y(), geom.width(), geom.height()
+
+        # Right edge: adjust width
+        if edge_idx in (1, 7):
+            new_w = max(self.minimumWidth(), geom.width() + delta.x())
+        # Left edge: adjust x and width
+        if edge_idx in (0, 6):
+            new_w = max(self.minimumWidth(), geom.width() - delta.x())
+            new_x = geom.x() + delta.x()
+        # Bottom edge: adjust height
+        if edge_idx in (3, 5):
+            new_h = max(self.minimumHeight(), geom.height() + delta.y())
+        # Top edge: adjust y and height
+        if edge_idx in (0, 4):
+            new_h = max(self.minimumHeight(), geom.height() - delta.y())
+            new_y = geom.y() + delta.y()
+
+        self.setGeometry(new_x, new_y, new_w, new_h)
+
+    def _grip_release(self, event, grip):
+        self._grip_start_pos = None
+        self._grip_start_geometry = None
+        self._grip_edge_idx = None
+        grip.releaseMouse()
 
     def _update_status_indicators(self):
         """Update the title bar status dot and text."""
@@ -550,7 +864,7 @@ class MainWindow(QMainWindow):
     def _save_state(self):
         """Persist window geometry and panel selection for next launch."""
         try:
-            state_dir = pathlib.Path.home() / ".local" / "share" / "qmcmcp"
+            state_dir = pathlib.Path.home() / ".local" / "share" / "vmharness"
             state_dir.mkdir(parents=True, exist_ok=True)
             state_file = state_dir / "window_state.json"
             active_name = None
@@ -564,34 +878,23 @@ class MainWindow(QMainWindow):
                 "active_panel": active_name,
             }
             state_file.write_text(json.dumps(state), encoding="utf-8")
-        except Exception:
-            pass  # Never let state save crash the app
+        except (OSError, json.JSONDecodeError):
+            pass  # Never let state save crash the app — best-effort persistence
 
-    def closeEvent(self, event):
-        """Clean up on close."""
-        # Save window state for next launch
-        self._save_state()
-        # Don't disconnect — VM should keep running
-        self._telemetry_timer.stop()
-        self._reconnect_timer.stop()
-        if self.qmp_bridge:
-            self.qmp_bridge.stop()
-        if self.ssh_bridge:
-            self.ssh_bridge.stop()
-        event.accept()
+    # closeEvent is defined above in _setup_system_tray section (minimizes to tray)
 
 
 # ── Application Entry ───────────────────────────────────────────────────────────
 
 def main():
-    """Run the QEMU-MCP GUI application."""
+    """Run the VM-Harness GUI application."""
     from PyQt5.QtWidgets import QApplication
     from gui.theme import dark_palette
 
     app = QApplication(sys.argv)
-    app.setApplicationName("QEMU-MCP")
-    app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("QEMU-MCP")
+    app.setApplicationName("VM-Harness")
+    app.setApplicationVersion("2.0.0")
+    app.setOrganizationName("VM-Harness")
 
     # Apply global dark theme
     app.setStyle("Fusion")

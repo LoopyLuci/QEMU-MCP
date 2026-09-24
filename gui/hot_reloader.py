@@ -47,9 +47,9 @@ class HotReloader:
                 try:
                     content = py_file.read_bytes()
                     rel_path = str(py_file.relative_to(watch_dir.parent))
-                    hashes[rel_path] = hashlib.md5(content).hexdigest()
-                except Exception:
-                    pass
+                    hashes[rel_path] = hashlib.sha256(content).hexdigest()
+                except OSError:
+                    pass  # Cannot read file — skip and continue scanning
         return hashes
 
     def start(self):

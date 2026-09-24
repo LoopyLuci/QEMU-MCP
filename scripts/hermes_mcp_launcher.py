@@ -11,7 +11,7 @@ import os
 import sys
 from pathlib import Path
 
-PROJECT_DIR = Path(r"C:\Projects\QEMU-MCP").resolve()
+PROJECT_DIR = Path(r"C:\Projects\VM-Harness").resolve()
 if not PROJECT_DIR.is_dir():
     print(f"ERROR: project dir not found: {PROJECT_DIR}", file=sys.stderr)
     sys.exit(1)

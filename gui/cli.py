@@ -1,4 +1,4 @@
-"""QEMU-MCP CLI — command-line interface for agent access.
+"""VM-Harness CLI — command-line interface for agent access.
 
 Usage:
     qemu-mcp status              # Show system status
@@ -150,7 +150,7 @@ def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="qemu-mcp",
-        description="QEMU-MCP: Control QEMU virtual machines"
+        description="VM-Harness: Control QEMU virtual machines"
     )
     subparsers = parser.add_subparsers(dest="command")
 

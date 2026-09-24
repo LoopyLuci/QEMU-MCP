@@ -14,12 +14,141 @@ from PyQt5.QtWidgets import (
     QLineEdit, QComboBox, QSplitter, QFrame, QScrollArea, QSizePolicy,
     QProgressBar, QGroupBox, QGridLayout, QCheckBox, QSpinBox, QTabWidget,
     QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog, QMessageBox,
-    QInputDialog,
+    QInputDialog, QToolButton, QMenu, QAction,
 )
 
 from gui.api_providers import APIProviders
-from gui.chat_engine import ChatEngine, ChatMessage
+from gui.chat_engine import ChatEngine, ChatMessage, ToolExecutor
 from gui.provider_store import ProviderStore
+from gui.qmp_bridge import QMPBridge
+from gui.ssh_bridge import SSHBridge
+from gui.iso_manager import ISOManager
+
+
+class ExpandableToolWidget(QFrame):
+    """A collapsible widget that shows tool call details."""
+
+    def __init__(self, tool_name: str, tool_args: dict, parent=None):
+        super().__init__(parent)
+        self._tool_name = tool_name
+        self._tool_args = tool_args
+        self._expanded = False
+        self._result_text = ""
+        self._build_ui()
+
+    def _build_ui(self):
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setStyleSheet(
+            "QFrame {"
+            "  background: " + T.BG_SECONDARY + ";"
+            "  border: 1px solid " + T.BG_TERTIARY + ";"
+            "  border-radius: 6px;"
+            "  margin: 2px 0;"
+            "}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(4)
+
+        # Header row (always visible)
+        header = QHBoxLayout()
+        self._toggle_btn = QToolButton()
+        self._toggle_btn.setText("▶")
+        self._toggle_btn.setStyleSheet(
+            "QToolButton { border: none; color: " + T.TEXT_SECONDARY + "; font-size: 10px; }"
+        )
+        self._toggle_btn.setFixedSize(20, 20)
+        self._toggle_btn.clicked.connect(self._toggle)
+        header.addWidget(self._toggle_btn)
+
+        # Tool icon/label
+        icon = self._get_tool_icon(self._tool_name)
+        name_label = QLabel(f"{icon} {self._tool_name}")
+        name_label.setStyleSheet(
+            "color: " + T.WARNING + "; font-weight: bold; font-size: 11px;"
+        )
+        header.addWidget(name_label)
+        header.addStretch()
+
+        # Status indicator
+        self._status_label = QLabel("⏳ running")
+        self._status_label.setStyleSheet("color: " + T.TEXT_MUTED + "; font-size: 10px;")
+        header.addWidget(self._status_label)
+        layout.addLayout(header)
+
+        # Args summary (always visible)
+        args_str = ", ".join(f"{k}={v}" for k, v in self._tool_args.items())
+        if not args_str:
+            args_str = "(no args)"
+        self._args_label = QLabel(f"  Args: {args_str[:80]}{'...' if len(args_str) > 80 else ''}")
+        self._args_label.setStyleSheet("color: " + T.TEXT_MUTED + "; font-size: 10px; padding-left: 20px;")
+        layout.addWidget(self._args_label)
+
+        # Detail section (hidden by default)
+        self._detail_widget = QWidget()
+        detail_layout = QVBoxLayout(self._detail_widget)
+        detail_layout.setContentsMargins(20, 4, 4, 4)
+        detail_layout.setSpacing(4)
+
+        # Arguments detail
+        args_detail = QLabel(f"<b>Arguments:</b> {self._format_args()}")
+        args_detail.setWordWrap(True)
+        args_detail.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        args_detail.setStyleSheet("color: " + T.TEXT_SECONDARY + "; font-size: 10px; font-family: Consolas, monospace;")
+        detail_layout.addWidget(args_detail)
+
+        # Result section
+        self._result_label = QLabel("")
+        self._result_label.setWordWrap(True)
+        self._result_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._result_label.setStyleSheet(
+            "color: " + T.TEXT_PRIMARY + "; font-size: 10px; font-family: Consolas, monospace;"
+            " background: " + T.BG_PRIMARY + "; padding: 6px; border-radius: 4px;"
+        )
+        detail_layout.addWidget(self._result_label)
+
+        self._detail_widget.hide()
+        layout.addWidget(self._detail_widget)
+
+    def _get_tool_icon(self, name: str) -> str:
+        icons = {
+            "vm_status": "📊",
+            "vm_start": "▶️",
+            "vm_stop": "⏹️",
+            "vm_reset": "🔄",
+            "vm_suspend": "⏸️",
+            "vm_resume": "▶️",
+            "guest_exec": "💻",
+            "snapshot_create": "📸",
+            "snapshot_list": "📋",
+            "snapshot_restore": "⏪",
+            "iso_list": "💿",
+            "iso_import": "📥",
+            "get_usage": "📈",
+        }
+        return icons.get(name, "🔧")
+
+    def _format_args(self) -> str:
+        if not self._tool_args:
+            return "{}"
+        return str(self._tool_args)
+
+    def _toggle(self):
+        self._expanded = not self._expanded
+        self._toggle_btn.setText("▼" if self._expanded else "▶")
+        self._detail_widget.setVisible(self._expanded)
+
+    def set_result(self, result: str, success: bool = True):
+        """Update the widget with the tool result."""
+        self._result_text = result
+        self._status_label.setText("✅ done" if success else "❌ failed")
+        self._status_label.setStyleSheet(
+            "color: " + T.SUCCESS + "; font-size: 10px;" if success
+            else "color: " + T.ERROR + "; font-size: 10px;"
+        )
+        # Truncate long results for display
+        display = result[:2000] + ("..." if len(result) > 2000 else "")
+        self._result_label.setText(f"<b>Result:</b>\n{display}")
 
 
 class ChatPanel(QWidget):
@@ -29,10 +158,33 @@ class ChatPanel(QWidget):
         super().__init__(parent)
         self._store = ProviderStore()
         self._providers = APIProviders(self._store)
-        self._engine = ChatEngine(self._providers)
         self._current_response = ""
         self._is_streaming = False
+        self._tool_widgets: list[ExpandableToolWidget] = []
+
+        # Create bridges
+        self._qmp_bridge: QMPBridge | None = None
+        self._ssh_bridge: SSHBridge | None = None
+        self._iso_manager = ISOManager()
+
+        # Create tool executor
+        self._executor = ToolExecutor(
+            qmp_bridge=None,
+            ssh_bridge=None,
+            iso_manager=self._iso_manager,
+        )
+
+        # Create chat engine with executor
+        self._engine = ChatEngine(self._providers, self._executor)
+
+        # Connect engine signals
+        self._engine.tool_call_started.connect(self._on_tool_started)
+        self._engine.tool_call_finished.connect(self._on_tool_finished)
+
         self.setStyleSheet("background: " + T.BG_PRIMARY + ";")
+        self._build_ui()
+
+    def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -110,6 +262,16 @@ class ChatPanel(QWidget):
         self._append_message("system", "Welcome to Agentic Chat! I can help you control your VM, execute commands, manage snapshots, and more.")
         self._append_message("system", "Select a provider above and start chatting. If you haven't configured an API key, go to Settings > AI Providers.")
 
+    def set_qmp_bridge(self, bridge: QMPBridge):
+        """Attach a QMP bridge for VM operations."""
+        self._qmp_bridge = bridge
+        self._executor.set_qmp_bridge(bridge)
+
+    def set_ssh_bridge(self, bridge: SSHBridge):
+        """Attach an SSH bridge for guest operations."""
+        self._ssh_bridge = bridge
+        self._executor.set_ssh_bridge(bridge)
+
     def _refresh_providers(self):
         """Refresh the provider dropdown."""
         self._provider_combo.clear()
@@ -165,10 +327,40 @@ class ChatPanel(QWidget):
             self._is_streaming = False
             self._send_btn.setEnabled(True)
 
+    @pyqtSlot(str, dict)
+    def _on_tool_started(self, name: str, args: dict):
+        """Handle tool execution start — add expandable widget."""
+        widget = ExpandableToolWidget(name, args)
+        self._tool_widgets.append(widget)
+        # Insert widget into chat display
+        cursor = self._chat_display.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        # Add a placeholder for the widget
+        self._chat_display.append("")  # spacer
+        # Store reference for updating
+        self._pending_tool_widget = widget
+        self._chat_display.append(f'<div style="margin: 4px 0;">🔧 <b style="color: {T.WARNING};">{name}</b> <span style="color: {T.TEXT_MUTED};">running...</span></div>')
+
+    @pyqtSlot(str, str)
+    def _on_tool_finished(self, name: str, result: str):
+        """Handle tool execution finish — update the widget."""
+        success = not result.startswith("[failed]")
+        # Update the last tool widget display
+        display_result = result[:500] + ("..." if len(result) > 500 else "")
+        color = T.SUCCESS if success else T.ERROR
+        status = "✅" if success else "❌"
+        self._chat_display.append(
+            f'<div style="margin: 2px 0 8px 0; padding: 6px; background: {T.BG_SECONDARY}; border-radius: 4px;">'
+            f'{status} <b style="color: {color};">{name}</b>: '
+            f'<span style="color: {T.TEXT_SECONDARY}; font-family: Consolas, monospace; font-size: 10px;">{display_result}</span>'
+            f'</div>'
+        )
+        self._chat_display.moveCursor(QTextCursor.End)
+
     def _append_message(self, role: str, content: str):
         """Append a message to the chat display."""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        
+
         colors = {
             "user": T.BRAND,
             "assistant": T.SUCCESS,
@@ -176,7 +368,7 @@ class ChatPanel(QWidget):
             "system": T.TEXT_MUTED,
         }
         color = colors.get(role, T.TEXT_PRIMARY)
-        
+
         role_labels = {
             "user": "You",
             "assistant": "AI",
@@ -184,10 +376,10 @@ class ChatPanel(QWidget):
             "system": "System",
         }
         role_label = role_labels.get(role, role)
-        
+
         html = f'<p><span style="color: {color}; font-weight: bold;">[{timestamp}] {role_label}:</span> {content}</p>'
         self._chat_display.append(html)
-        
+
         # Auto-scroll
         self._chat_display.moveCursor(QTextCursor.End)
 
@@ -195,4 +387,5 @@ class ChatPanel(QWidget):
         """Clear chat history."""
         self._chat_display.clear()
         self._engine.clear_history()
+        self._tool_widgets.clear()
         self._append_message("system", "Chat history cleared.")

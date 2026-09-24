@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (c) 2026 VM-Harness
+  Licensed under the MIT License (see LICENSE file).
+-->
+<resources>
+    <!-- Base application theme (dark by default, matching desktop Fusion dark theme) -->
+    <style name="Theme_VMHarness" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

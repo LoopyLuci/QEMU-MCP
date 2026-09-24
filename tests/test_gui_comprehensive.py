@@ -39,13 +39,46 @@ def app():
 
 
 @pytest.fixture(scope="session")
-def main_window(app):
-    """Create MainWindow with all panels."""
+def main_window(app, request):
+    """Create MainWindow with all panels. Uses mocked bridges to avoid access violations from live thread teardown."""
     from gui.main_window import MainWindow
     from gui.widgets import apply_global_theme
+    from unittest.mock import MagicMock
     
     apply_global_theme(app)
+    
+    # Create mock bridges that don't spawn real threads
+    mock_qmp = MagicMock()
+    mock_qmp.is_connected = False
+    mock_qmp.start = MagicMock()
+    mock_qmp.stop = MagicMock()
+    mock_qmp.connected = MagicMock()
+    mock_qmp.vm_status = MagicMock()
+    mock_qmp.error = MagicMock()
+    mock_qmp.command_result = MagicMock()
+    
+    mock_ssh = MagicMock()
+    mock_ssh.is_connected = False
+    mock_ssh.start = MagicMock()
+    mock_ssh.stop = MagicMock()
+    mock_ssh.connected = MagicMock()
+    mock_ssh.connected_to = MagicMock()
+    mock_ssh.command_output = MagicMock()
+    mock_ssh.file_content = MagicMock()
+    mock_ssh.file_list = MagicMock()
+    mock_ssh.error = MagicMock()
+    
     window = MainWindow()
+    window.qmp_bridge = mock_qmp
+    window.ssh_bridge = mock_ssh
+    
+    # Wire panels to mock bridges
+    for panel_name, panel in window.panels.items():
+        if hasattr(panel, 'set_qmp_bridge'):
+            panel.set_qmp_bridge(mock_qmp)
+        if hasattr(panel, 'set_ssh_bridge'):
+            panel.set_ssh_bridge(mock_ssh)
+    
     window.resize(1400, 900)
     window.show()
     return window
@@ -451,3 +484,43 @@ class TestCrossCutting:
     def test_telemetry_timer(self, main_window):
         """Telemetry timer should exist."""
         assert hasattr(main_window, '_telemetry_timer')
+
+    def test_settings_panel_exists(self, main_window):
+        """Settings panel should exist."""
+        assert "settings" in main_window.panels
+
+    def test_security_panel_exists(self, main_window):
+        """Security panel (audit log) should exist."""
+        assert "security" in main_window.panels
+
+    def test_chat_panel_exists(self, main_window):
+        """Chat panel should exist."""
+        assert "chat" in main_window.panels
+
+    def test_providers_panel_exists(self, main_window):
+        """AI Providers panel should exist."""
+        assert "providers" in main_window.panels
+
+    def test_iso_panel_exists(self, main_window):
+        """ISO Manager panel should exist."""
+        assert "iso" in main_window.panels
+
+    def test_usb_panel_exists(self, main_window):
+        """USB Device panel should exist."""
+        assert "usb" in main_window.panels
+
+    def test_network_panel_exists(self, main_window):
+        """Network panel should exist."""
+        assert "network" in main_window.panels
+
+    def test_monitoring_panel_exists(self, main_window):
+        """Monitoring panel should exist."""
+        assert "monitoring" in main_window.panels
+
+    def test_automation_panel_exists(self, main_window):
+        """Automation panel should exist."""
+        assert "automation" in main_window.panels
+
+    def test_logs_panel_exists(self, main_window):
+        """Logs panel should exist."""
+        assert "logs" in main_window.panels

@@ -52,7 +52,7 @@ SKILLS: list[Skill] = [
         description=(
             "Interact with the running Omarchy guest VM via SSH: execute "
             "commands, read/write files, list directories, and remove files. "
-            "All operations run as the configured SSH user (OmarchyVM)."
+            "All operations run as the configured SSH user (vmharness)."
         ),
         tools=["guest_exec", "guest_file_read", "guest_file_write", "guest_file_list", "guest_file_remove"],
         example=(

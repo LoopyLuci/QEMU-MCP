@@ -1,13 +1,14 @@
-"""VM Control panel — full VM lifecycle management with QMP bridge integration.
+"""VM Control Panel — full VM lifecycle management with multi-VM QMP bridge integration.
 
 Provides Start, Stop, Reset, Suspend, Resume, Eject ISO controls
-wired to the QMPBridge for real VM operations.
+wired to the MultiVMQMPBridge for context-aware VM operations.
+Switches context based on the currently selected VM.
 """
 
 from __future__ import annotations
 
 from gui.theme import T
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QWidget,
@@ -19,25 +20,104 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QProgressBar,
     QSpinBox,
+    QCheckBox,
     QSizePolicy,
+    QFrame,
 )
 
 from gui.widgets import Card, StatusIndicator, SectionHeader, StatCard
+from gui.multi_vm_qmp_bridge import MultiVMQMPBridge
+from gui.multi_vm import MultiVMManager
 
 
 class VMControlPanel(QWidget):
-    """Full VM lifecycle control panel with real QMP integration."""
+    """Full VM lifecycle control panel with multi-VM QMP integration.
+
+    Context switches based on the selected VM — displays VM-specific config
+    and routes QMP commands to the correct VM bridge.
+    """
+
+    vm_action_requested = pyqtSignal(str, str)  # action, vm_name
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._qmp_bridge = None
+        self._multi_qmp: MultiVMQMPBridge | None = None
+        self._manager: MultiVMManager | None = None
+        self._active_vm: str | None = None
         self.setStyleSheet("background: " + T.BG_PRIMARY + ";")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
         layout.setAlignment(Qt.AlignTop)
 
-        # ── Connection Status ──────────────────────────────────────────────────
+        # ── Active VM Context Header ───────────────────────────────────────────
+        context_card = Card("Active VM Context")
+        context_card.setFixedHeight(60)
+        layout.addWidget(context_card)
+
+        context_row = QWidget()
+        cr_layout = QHBoxLayout(context_row)
+        cr_layout.setContentsMargins(0, 0, 0, 0)
+        cr_layout.setSpacing(8)
+
+        self._context_dot = StatusIndicator(QColor(T.TEXT_MUTED))
+        cr_layout.addWidget(self._context_dot, alignment=Qt.AlignVCenter)
+
+        self._context_label = QLabel("No VM selected")
+        self._context_label.setStyleSheet(
+            f"color: {T.TEXT_MUTED}; font-size: 12px;"
+        )
+        cr_layout.addWidget(self._context_label)
+        cr_layout.addStretch()
+
+        self._context_vm_label = QLabel("")
+        self._context_vm_label.setStyleSheet(
+            f"color: {T.BRAND}; font-weight: bold; font-size: 12px;"
+        )
+        cr_layout.addWidget(self._context_vm_label)
+
+        context_card.content_layout.addWidget(context_row)
+
+        # ── Hardware Acceleration ─────────────────────────────────────────────────
+        accel_card = Card("Hardware Acceleration")
+        layout.addWidget(accel_card)
+
+        accel_row = QWidget()
+        accel_row_layout = QHBoxLayout(accel_row)
+        accel_row_layout.setContentsMargins(0, 0, 0, 0)
+        accel_row_layout.setSpacing(12)
+
+        self._accel_check = QCheckBox("Enable WHPX Acceleration")
+        self._accel_check.setChecked(True)
+        self._accel_check.setStyleSheet(
+            f"QCheckBox {{ color: {T.TEXT_PRIMARY}; font-size: 12px; }}"
+            f"QCheckBox::indicator:checked {{ background: {T.ACCENT}; border-color: {T.ACCENT}; }}"
+        )
+        self._accel_check.toggled.connect(self._on_accel_toggled)
+        accel_row_layout.addWidget(self._accel_check)
+
+        self._accel_status = StatusIndicator(QColor(T.SUCCESS))
+        self._accel_status.setFixedSize(10, 10)
+        accel_row_layout.addWidget(self._accel_status, alignment=Qt.AlignVCenter)
+
+        self._accel_status_label = QLabel("WHPX Active")
+        self._accel_status_label.setStyleSheet(f"color: {T.SUCCESS}; font-size: 11px;")
+        accel_row_layout.addWidget(self._accel_status_label)
+
+        accel_row_layout.addStretch()
+        accel_card.content_layout.addWidget(accel_row)
+
+        # Accel warning label (shown when disabled)
+        self._accel_warning = QLabel("")
+        self._accel_warning.setStyleSheet(
+            f"color: {T.WARNING}; font-size: 11px; background: {T.WARNING_BG};"
+            f" padding: 6px 10px; border-radius: 4px;"
+        )
+        self._accel_warning.setWordWrap(True)
+        self._accel_warning.hide()
+        accel_card.content_layout.addWidget(self._accel_warning)
+
+        # ── QMP Connection ──────────────────────────────────────────────────────────
         conn_card = Card("QMP Connection")
         layout.addWidget(conn_card)
 
@@ -50,28 +130,20 @@ class VMControlPanel(QWidget):
         conn_row_layout.addWidget(self.qmp_status, alignment=Qt.AlignVCenter)
 
         self.conn_info = QLabel("Disconnected — QMP not available")
-        self.conn_info.setStyleSheet("color: #64748b; font-size: 12px;")
+        self.conn_info.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 12px;")
         conn_row_layout.addWidget(self.conn_info)
         conn_row_layout.addStretch()
 
         self.connect_btn = QPushButton("Connect to QMP")
         self.connect_btn.setFixedHeight(32)
-        self.connect_btn.setStyleSheet("""
-            QPushButton {
-                background: #3b82f6;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-size: 12px;
-                padding: 0 16px;
-            }
-            QPushButton:hover { background: #2563eb; }
-            QPushButton:disabled { background: #3b82f620; color: #64748b; }
-        """)
+        self.connect_btn.setStyleSheet(
+            f"QPushButton {{ background: {T.BRAND}; color: white; border: none;"
+            f" border-radius: 4px; font-size: 12px; padding: 0 16px; }}"
+            f"QPushButton:hover {{ background: {T.BRAND_HOVER}; }}"
+            f"QPushButton:disabled {{ background: {T.BRAND}20; color: {T.TEXT_MUTED}; }}"
+        )
         conn_row_layout.addWidget(self.connect_btn)
-
         conn_card.content_layout.addWidget(conn_row)
-        conn_card.content_layout.addStretch()
 
         # ── VM Lifecycle Controls ──────────────────────────────────────────────
         life_card = Card("VM Lifecycle Control")
@@ -83,12 +155,12 @@ class VMControlPanel(QWidget):
         btn_row_layout.setSpacing(10)
 
         buttons_spec = [
-            ("Start", "\U0001f7e2", T.SUCCESS, "Start the virtual machine"),
-            ("Stop", "\u23f9", T.ERROR, "Gracefully stop the VM"),
-            ("Reset", "\U0001f504", T.WARNING, "Reset the VM (warm reboot)"),
-            ("Suspend", "\u23f8", T.BRAND, "Suspend the VM to disk"),
-            ("Resume", "\u25b6", T.SUCCESS, "Resume a suspended VM"),
-            ("Eject ISO", "\U0001f4bf", T.INFO, "Eject the boot ISO"),
+            ("Start", "🟢", T.SUCCESS, "Start the virtual machine"),
+            ("Stop", "⏹", T.ERROR, "Gracefully stop the VM"),
+            ("Reset", "🔄", T.WARNING, "Reset the VM (warm reboot)"),
+            ("Suspend", "⏸", T.BRAND, "Suspend the VM to disk"),
+            ("Resume", "▶", T.SUCCESS, "Resume a suspended VM"),
+            ("Eject ISO", "💿", T.INFO, "Eject the boot ISO"),
         ]
 
         self._lifecycle_btns = {}
@@ -97,27 +169,19 @@ class VMControlPanel(QWidget):
             btn.setFixedHeight(40)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setToolTip(tooltip)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background: {color};
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    font-size: 13px;
-                    font-weight: 600;
-                    padding: 0 12px;
-                }}
-                QPushButton:hover {{ background: {self._darker(color)}; }}
-                QPushButton:disabled {{ background: {color}20; color: #64748b; }}
-            """)
+            btn.setStyleSheet(
+                f"QPushButton {{ background: {color}; color: white; border: none;"
+                f" border-radius: 6px; font-size: 13px; font-weight: 600; padding: 0 12px; }}"
+                f"QPushButton:hover {{ background: {self._darker(color)}; }}"
+                f"QPushButton:disabled {{ background: {color}20; color: {T.TEXT_MUTED}; }}"
+            )
             btn_row_layout.addWidget(btn)
             self._lifecycle_btns[label] = btn
 
         btn_row_layout.addStretch()
         life_card.content_layout.addWidget(btn_row)
-        life_card.content_layout.addStretch()
 
-        # ── VM Configuration Display ───────────────────────────────────────────
+        # ── VM Configuration Display (context-aware) ────────────────────────────
         config_card = Card("VM Configuration")
         layout.addWidget(config_card)
 
@@ -126,225 +190,266 @@ class VMControlPanel(QWidget):
         config_grid.setSpacing(8)
         config_grid.setColumnStretch(1, 1)
 
+        self._config_labels: dict[str, QLabel] = {}
         config_fields = [
-            ("VM Name", "omarchy-vm"),
-            ("Display", "SDL (OpenGL)"),
-            ("RAM", "16384 MB"),
-            ("vCPUs", "8"),
-            ("Disk Image", "disk.qcow2 (64 GB)"),
-            ("Boot ISO", "omarchy-4.0.4.iso"),
-            ("Hostname", "omarchy-vm"),
-            ("QMP Port", "4444 (TCP)"),
-            ("Guest SSH", "127.0.0.1:2222"),
+            "VM Name", "Status", "RAM", "vCPUs", "Disk Image",
+            "QMP Port", "SSH Port", "QMP URI", "SSH URI",
         ]
 
-        for i, (label, value) in enumerate(config_fields):
+        for i, field_name in enumerate(config_fields):
             row = i // 3
             col = (i % 3) * 2
-            lbl = QLabel(label)
-            lbl.setStyleSheet("color: #64748b; font-size: 11px;")
-            lbl.setFixedWidth(80)
+            lbl = QLabel(field_name)
+            lbl.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 11px;")
+            lbl.setFixedWidth(70)
             config_grid.addWidget(lbl, row, col)
 
-            val = QLabel(value)
-            val.setStyleSheet("color: #e2e8f0; font-size: 12px;")
+            val = QLabel("—")
+            val.setStyleSheet(f"color: {T.TEXT_PRIMARY}; font-size: 12px;")
             config_grid.addWidget(val, row, col + 1)
+            self._config_labels[field_name] = val
 
         config_card.content_layout.addLayout(config_grid)
-        config_card.content_layout.addStretch()
-
-        # ── Boot Device Selector ───────────────────────────────────────────────
-        boot_card = Card("Boot Configuration")
-        layout.addWidget(boot_card)
-
-        boot_row = QWidget()
-        boot_row_layout = QHBoxLayout(boot_row)
-        boot_row_layout.setContentsMargins(0, 0, 0, 0)
-        boot_row_layout.setSpacing(12)
-
-        boot_label = QLabel("Boot from:")
-        boot_label.setStyleSheet("color: #cbd5e1; font-size: 13px;")
-        boot_label.setFixedWidth(80)
-        boot_row_layout.addWidget(boot_label)
-
-        self.boot_combo = QComboBox()
-        self.boot_combo.addItems([
-            "Hard Disk (disk.qcow2)",
-            "CD-ROM (omarchy-4.0.4.iso)",
-            "Network (PXE)",
-        ])
-        self.boot_combo.setFixedWidth(220)
-        self.boot_combo.setStyleSheet("""
-            QComboBox {
-                background: #0f172a;
-                color: #e2e8f0;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 12px;
-            }
-            QComboBox:hover { border-color: #3b82f6; }
-            QComboBox::drop-down { border: none; }
-            QComboBox::down-arrow { image: none; }
-        """)
-        boot_row_layout.addWidget(self.boot_combo)
-
-        apply_btn = QPushButton("Apply Boot Order")
-        apply_btn.setFixedHeight(28)
-        apply_btn.setStyleSheet("""
-            QPushButton {
-                background: #334155;
-                color: #e2e8f0;
-                border: 1px solid #475569;
-                border-radius: 4px;
-                font-size: 12px;
-                padding: 0 12px;
-            }
-            QPushButton:hover { background: #475569; }
-        """)
-        boot_row_layout.addWidget(apply_btn)
-
-        boot_row_layout.addStretch()
-        boot_card.content_layout.addWidget(boot_row)
-        boot_card.content_layout.addStretch()
 
         # ── Progress ───────────────────────────────────────────────────────────
         self.progress = QProgressBar()
         self.progress.setFixedHeight(4)
-        self.progress.setStyleSheet("""
-            QProgressBar {
-                background: #1e293b;
-                border: none;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background: #3b82f6;
-                border-radius: 2px;
-            }
-        """)
+        self.progress.setStyleSheet(
+            f"QProgressBar {{ background: {T.BG_SECONDARY}; border: none; text-align: center; }}"
+            f"QProgressBar::chunk {{ background: {T.BRAND}; border-radius: 2px; }}"
+        )
         self.progress.setMaximum(0)
         self.progress.hide()
         layout.addWidget(self.progress)
 
         # ── Info log ───────────────────────────────────────────────────────────
-        self.info_label = QLabel("Ready — use the controls above to manage the VM.")
-        self.info_label.setStyleSheet("color: #64748b; font-size: 12px;")
+        self.info_label = QLabel("Select a VM to control it.")
+        self.info_label.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 12px;")
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
 
         # ── Wire buttons ───────────────────────────────────────────────────────
         self.connect_btn.clicked.connect(self._on_connect)
-        self._wire_lifecycle_buttons()
+        self._lifecycle_btns["Start"].clicked.connect(self._on_start)
+        self._lifecycle_btns["Stop"].clicked.connect(self._on_stop)
+        self._lifecycle_btns["Reset"].clicked.connect(self._on_reset)
+        self._lifecycle_btns["Suspend"].clicked.connect(self._on_suspend)
+        self._lifecycle_btns["Resume"].clicked.connect(self._on_resume)
+        self._lifecycle_btns["Eject ISO"].clicked.connect(self._on_eject)
 
         # ── Status timer ───────────────────────────────────────────────────────
         self._pulse_timer = QTimer(self)
         self._pulse_timer.timeout.connect(self._pulse_connection)
         self._pulse_timer.start(5000)
 
-    def _wire_lifecycle_buttons(self):
-        """Wire lifecycle buttons to QMP bridge commands."""
-        self._lifecycle_btns["Start"].clicked.connect(self._qmp_start)
-        self._lifecycle_btns["Stop"].clicked.connect(self._qmp_stop)
-        self._lifecycle_btns["Reset"].clicked.connect(self._qmp_reset)
-        self._lifecycle_btns["Suspend"].clicked.connect(self._qmp_suspend)
-        self._lifecycle_btns["Resume"].clicked.connect(self._qmp_resume)
-        self._lifecycle_btns["Eject ISO"].clicked.connect(self._qmp_eject)
-
-    def set_qmp_bridge(self, bridge):
-        """Connect to QMP bridge for commands."""
-        self._qmp_bridge = bridge
+    def set_multi_qmp_bridge(self, bridge: MultiVMQMPBridge):
+        """Set the multi-VM QMP bridge."""
+        self._multi_qmp = bridge
         bridge.connected.connect(self._on_bridge_connected)
         bridge.error.connect(self._on_bridge_error)
+        bridge.active_vm_changed.connect(self._on_active_vm_changed)
+        bridge.command_result.connect(self._on_command_result)
 
-    def _on_bridge_connected(self, connected: bool):
+    def set_manager(self, manager: MultiVMManager):
+        """Set the MultiVMManager for config access."""
+        self._manager = manager
+
+    def switch_to_vm(self, vm_name: str):
+        """Switch the control panel context to a specific VM."""
+        self._active_vm = vm_name
+
+        if self._multi_qmp:
+            self._multi_qmp.switch_to_vm(vm_name)
+
+        self._update_context_display()
+        self._update_config_display()
+        self._update_button_states()
+
+    def _update_context_display(self):
+        """Update the context header with current VM info."""
+        if not self._active_vm:
+            self._context_label.setText("No VM selected")
+            self._context_label.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 12px;")
+            self._context_vm_label.setText("")
+            self._context_dot.set_status(False, False)
+            return
+
+        self._context_label.setText("Controlling:")
+        self._context_label.setStyleSheet(f"color: {T.TEXT_SECONDARY}; font-size: 12px;")
+        self._context_vm_label.setText(self._active_vm)
+
+        if self._multi_qmp and self._multi_qmp.active_vm == self._active_vm:
+            bridge = self._multi_qmp.get_bridge(self._active_vm)
+            if bridge and bridge.is_connected:
+                self._context_dot.set_status(True, True)
+            else:
+                self._context_dot.set_status(False, False)
+
+    def _update_config_display(self):
+        """Update the config display panel with current VM's settings."""
+        if not self._active_vm or not self._manager:
+            for label in self._config_labels.values():
+                label.setText("—")
+            return
+
+        config = self._manager.get_vm(self._active_vm)
+        if not config:
+            return
+
+        status = self._manager.get_status(self._active_vm)
+
+        self._config_labels["VM Name"].setText(config.vm_name)
+        self._config_labels["Status"].setText(status)
+        self._config_labels["Status"].setStyleSheet(
+            f"color: {'#22c55e' if status == 'running' else '#f59e0b' if status == 'paused' else '#64748b'}; font-size: 12px;"
+        )
+        self._config_labels["RAM"].setText(f"{config.ram_mb} MB")
+        self._config_labels["vCPUs"].setText(str(config.cpus))
+        self._config_labels["Disk Image"].setText(
+            config.disk_path if config.disk_path else "—"
+        )
+        self._config_labels["QMP Port"].setText(str(config.qmp_port))
+        self._config_labels["SSH Port"].setText(str(config.ssh_port))
+        self._config_labels["QMP URI"].setText(self._manager.get_qmp_uri(self._active_vm) or "—")
+        self._config_labels["SSH URI"].setText(self._manager.get_ssh_uri(self._active_vm) or "—")
+
+    def _update_button_states(self):
+        """Enable/disable buttons based on VM status."""
+        if not self._active_vm or not self._manager:
+            for btn in self._lifecycle_btns.values():
+                btn.setEnabled(False)
+            return
+
+        status = self._manager.get_status(self._active_vm)
+        is_running = status == "running"
+        is_paused = status == "paused"
+        is_stopped = status == "stopped"
+
+        self._lifecycle_btns["Start"].setEnabled(is_stopped or is_paused)
+        self._lifecycle_btns["Stop"].setEnabled(is_running or is_paused)
+        self._lifecycle_btns["Reset"].setEnabled(is_running)
+        self._lifecycle_btns["Suspend"].setEnabled(is_running)
+        self._lifecycle_btns["Resume"].setEnabled(is_paused)
+        self._lifecycle_btns["Eject ISO"].setEnabled(is_running)
+
+    # ── QMP Command Handlers ──────────────────────────────────────────────────
+
+    def _on_connect(self):
+        """Connect to the active VM's QMP."""
+        if not self._multi_qmp:
+            self._show_info("QMP bridge not initialized", success=False)
+            return
+        if not self._active_vm:
+            self._show_info("No VM selected", success=False)
+            return
+        self.connect_btn.setEnabled(False)
+        self.connect_btn.setText("Connecting...")
+        self.conn_info.setText("Connecting to QMP...")
+        self.conn_info.setStyleSheet(f"color: {T.WARNING}; font-size: 12px;")
+        self._multi_qmp.connect()
+
+    def _on_start(self):
+        """Start the active VM."""
+        if self._manager and self._active_vm:
+            success, msg = self._manager.start_vm(self._active_vm)
+            self._show_info(msg, success)
+            self.vm_action_requested.emit("start", self._active_vm)
+
+    def _on_stop(self):
+        """Stop the active VM."""
+        if self._multi_qmp:
+            self._multi_qmp.system_powerdown()
+            self._show_info("Stopping VM...", success=True)
+
+    def _on_reset(self):
+        """Reset the active VM."""
+        if self._multi_qmp:
+            self._multi_qmp.system_reset()
+            self._show_info("Resetting VM...", success=True)
+
+    def _on_suspend(self):
+        """Suspend the active VM."""
+        if self._multi_qmp:
+            self._multi_qmp.stop_vm()
+            self._show_info("Suspending VM...", success=True)
+
+    def _on_resume(self):
+        """Resume the active VM."""
+        if self._multi_qmp:
+            self._multi_qmp.cont()
+            self._show_info("Resuming VM...", success=True)
+
+    def _on_eject(self):
+        """Eject CD-ROM on the active VM."""
+        if self._multi_qmp:
+            self._multi_qmp.eject_cdrom()
+            self._show_info("Ejecting CD-ROM...", success=True)
+
+    # ── Bridge Callbacks ─────────────────────────────────────────────────────
+
+    def _on_bridge_connected(self, vm_name: str, connected: bool):
+        """Handle bridge connection state change."""
+        if vm_name != self._active_vm:
+            return
         if connected:
             self.qmp_status.set_status(running=True, connected=True)
             self.connect_btn.setEnabled(False)
             self.connect_btn.setText("Connected")
-            self.connect_btn.setStyleSheet("""
-                QPushButton {
-                    background: #22c55e;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    padding: 0 16px;
-                }
-            """)
-            self.conn_info.setText("Connected to QMP — VM controls active")
-            self.conn_info.setStyleSheet("color: #22c55e; font-size: 12px;")
+            self.connect_btn.setStyleSheet(
+                f"QPushButton {{ background: {T.SUCCESS}; color: white; border: none;"
+                f" border-radius: 4px; font-size: 12px; padding: 0 16px; }}"
+            )
+            self.conn_info.setText(f"Connected to QMP — {vm_name}")
+            self.conn_info.setStyleSheet(f"color: {T.SUCCESS}; font-size: 12px;")
+            self._context_dot.set_status(True, True)
         else:
             self.qmp_status.set_status(running=False, connected=False)
             self.connect_btn.setEnabled(True)
             self.connect_btn.setText("Connect to QMP")
             self.conn_info.setText("Disconnected — QMP not available")
-            self.conn_info.setStyleSheet("color: #64748b; font-size: 12px;")
+            self.conn_info.setStyleSheet(f"color: {T.TEXT_MUTED}; font-size: 12px;")
+            self._context_dot.set_status(False, False)
 
-    def _on_bridge_error(self, message: str):
-        self.info_label.setText(f"QMP: {message}")
-        self.info_label.setStyleSheet("color: #ef4444; font-size: 12px;")
+    def _on_bridge_error(self, vm_name: str, message: str):
+        """Handle bridge error."""
+        if vm_name == self._active_vm:
+            self.info_label.setText(f"QMP: {message}")
+            self.info_label.setStyleSheet(f"color: {T.ERROR}; font-size: 12px;")
 
-    # ── QMP Command Wrappers ──────────────────────────────────────────────────
+    def _on_active_vm_changed(self, vm_name: str):
+        """Handle active VM change in the bridge."""
+        if vm_name == self._active_vm:
+            self._update_context_display()
 
-    def _qmp_start(self):
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not available", success=False)
-            return
-        self._show_info("Starting VM...", success=True)
-        self._qmp_bridge.cont()
-        self.progress.show()
-
-    def _qmp_stop(self):
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not available", success=False)
-            return
-        self._show_info("Stopping VM...", success=True)
-        self._qmp_bridge.system_powerdown()
-
-    def _qmp_reset(self):
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not available", success=False)
-            return
-        self._show_info("Resetting VM...", success=True)
-        self._qmp_bridge.system_reset()
-
-    def _qmp_suspend(self):
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not available", success=False)
-            return
-        self._show_info("Suspending VM...", success=True)
-        self._qmp_bridge.stop()
-
-    def _qmp_resume(self):
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not available", success=False)
-            return
-        self._show_info("Resuming VM...", success=True)
-        self._qmp_bridge.cont()
-
-    def _qmp_eject(self):
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not available", success=False)
-            return
-        self._show_info("Ejecting CD-ROM...", success=True)
-        self._qmp_bridge.eject_cdrom()
-
-    def _on_connect(self):
-        """Handle QMP connect button — uses the bridge."""
-        if not self._qmp_bridge:
-            self._show_info("QMP bridge not initialized", success=False)
-            return
-        self.connect_btn.setEnabled(False)
-        self.connect_btn.setText("Connecting...")
-        self.conn_info.setText("Connecting to QMP...")
-        self.conn_info.setStyleSheet("color: #f59e0b; font-size: 12px;")
-        self._qmp_bridge.connect()
+    def _on_command_result(self, vm_name: str, result: dict):
+        """Handle QMP command result."""
+        if vm_name == self._active_vm:
+            ret = result.get("return", "ok")
+            self.info_label.setText(f"Result: {ret}")
+            self.info_label.setStyleSheet(f"color: {T.INFO}; font-size: 12px;")
 
     def _show_info(self, message: str, success: bool = True):
         """Display an info message."""
         color = T.SUCCESS if success else T.ERROR
         self.info_label.setText(message)
         self.info_label.setStyleSheet(f"color: {color}; font-size: 12px;")
+
+    def _on_accel_toggled(self, enabled: bool):
+        """Handle acceleration toggle — update status display and warning."""
+        if enabled:
+            self._accel_status.set_status(True, False)
+            self._accel_status_label.setText("WHPX Active")
+            self._accel_status_label.setStyleSheet(f"color: {T.SUCCESS}; font-size: 11px;")
+            self._accel_warning.hide()
+        else:
+            self._accel_status.set_status(False, False)
+            self._accel_status_label.setText("TCG (Software) — Slow")
+            self._accel_status_label.setStyleSheet(f"color: {T.WARNING}; font-size: 11px;")
+            self._accel_warning.setText(
+                "⚠️ Hardware acceleration disabled — VM will run in TCG (software) mode, "
+                "which is significantly slower and not recommended for production workloads."
+            )
+            self._accel_warning.show()
 
     def _pulse_connection(self):
         """Keep connection indicator alive."""

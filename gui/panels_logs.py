@@ -224,7 +224,7 @@ class LogsPanel(QWidget):
     def _seed_sample_logs(self):
         """Add sample log entries for demonstration."""
         sample_app = [
-            ("INFO", "QEMU-MCP GUI started"),
+            ("INFO", "VM-Harness GUI started"),
             ("INFO", "Loading configuration from .env"),
             ("INFO", "QMP client initialized (127.0.0.1:4444)"),
             ("INFO", "SSH client initialized (127.0.0.1:2222)"),

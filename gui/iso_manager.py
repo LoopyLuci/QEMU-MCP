@@ -72,7 +72,7 @@ class ISOManager:
                 with open(EXTERNAL_ISO_CONFIG, 'r') as f:
                     data = json.load(f)
                 self._external_sources = [Path(p) for p in data.get("sources", [])]
-            except Exception:
+            except json.JSONDecodeError:
                 self._external_sources = []
 
     def _save_config(self):
@@ -107,19 +107,26 @@ class ISOManager:
     def scan_isos(self) -> list[dict[str, Any]]:
         """Scan all ISO sources and return list of available ISOs."""
         isos = []
+        isos.extend(self.scan_external_isos())
         
         # Scan internal folder
         if self._internal_dir.exists():
-            for iso_file in self._internal_dir.glob("*.iso"):
-                isos.append(self._make_iso_entry(iso_file, "internal"))
+            for ext in ("*.iso", "*.img"):
+                for iso_file in self._internal_dir.glob(ext):
+                    isos.append(self._make_iso_entry(iso_file, "internal"))
         
+        self._iso_cache = isos
+        return isos
+
+    def scan_external_isos(self) -> list[dict[str, Any]]:
+        """Scan only external sources and return list of available ISOs."""
+        isos = []
         # Scan external folders
         for source in self._external_sources:
             if source.exists():
-                for iso_file in source.rglob("*.iso"):
-                    isos.append(self._make_iso_entry(iso_file, "external"))
-        
-        self._iso_cache = isos
+                for ext in ("*.iso", "*.img"):
+                    for iso_file in source.rglob(ext):
+                        isos.append(self._make_iso_entry(iso_file, "external"))
         return isos
 
     def _make_iso_entry(self, path: Path, source: str) -> dict[str, Any]:
@@ -142,6 +149,12 @@ class ISOManager:
                 return f"{size_bytes:.1f} {unit}"
             size_bytes /= 1024
         return f"{size_bytes:.1f} PB"
+
+    @staticmethod
+    def format_timestamp(timestamp: float) -> str:
+        """Format a Unix timestamp as a human-readable date string."""
+        from datetime import datetime
+        return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
 
     def get_iso_by_name(self, name: str) -> Optional[dict[str, Any]]:
         """Find an ISO by name (without extension)."""
@@ -174,8 +187,8 @@ class ISOManager:
             try:
                 path.unlink()
                 return True
-            except Exception:
-                return False
+            except OSError:
+                return False  # Cannot delete — permission or locked file
         return False
 
     def ensure_internal_dir(self):

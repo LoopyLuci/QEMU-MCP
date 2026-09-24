@@ -1,4 +1,4 @@
-"""Enhanced UI components for the QEMU-MCP GUI.
+"""Enhanced UI components for the VM-Harness GUI.
 
 All widgets consume design tokens from gui.theme (T) for consistent
 styling across the application.  New widgets: Toast, StatCard,
@@ -563,8 +563,8 @@ class IconButton(QPushButton):
                 if not icon.isNull():
                     self.setIcon(icon)
                     self.setIconSize(QSize(20, 20))
-            except Exception:
-                pass
+            except (RuntimeError, OSError):
+                pass  # Icon load failed — use text-only button
 
     def set_icon(self, icon: QIcon):
         self.setIcon(icon)
@@ -883,8 +883,9 @@ def apply_global_theme(app=None):
         app = QApplication.instance()
     if app is None:
         return
-    app.setApplicationName("QEMU-MCP")
+    app.setApplicationName("VM-Harness")
     app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("QEMU-MCP")
-    app.setStyle("Fusion")
+    app.setOrganizationName("VM-Harness")
+    if app.style().objectName() != "Fusion":
+        app.setStyle("Fusion")
     app.setPalette(dark_palette())

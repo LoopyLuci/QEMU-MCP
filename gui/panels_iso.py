@@ -12,7 +12,8 @@ from PyQt5.QtWidgets import (
     QTabWidget, QGroupBox, QGridLayout, QLineEdit, QCheckBox, QSpinBox,
     QSizePolicy, QProgressBar, QListWidget, QListWidgetItem, QFileDialog,
     QInputDialog, QAbstractItemView, QFrame, QSplitter, QToolBar,
-    QAction, QMenu, QStatusBar, QSizePolicy as QSP,
+    QAction, QMenu, QStatusBar, QSizePolicy as QSP, QDialog, QFormLayout,
+    QDialogButtonBox,
 )
 
 from gui.widgets import Card
@@ -54,6 +55,7 @@ class ISOManagerPanel(QWidget):
             "QTabBar::tab:selected { background: " + T.BRAND + "; color: white; }"
         )
         tabs.addTab(self._available_tab(), "Available ISOs")
+        tabs.addTab(self._external_tab(), "External ISOs")
         tabs.addTab(self._sources_tab(), "Sources")
         tabs.addTab(self._common_tab(), "Common ISOs")
         layout.addWidget(tabs)
@@ -128,6 +130,104 @@ class ISOManagerPanel(QWidget):
         bl.addStretch()
         layout.addWidget(btn_row)
         return page
+
+    def _external_tab(self) -> QWidget:
+        """Tab showing external ISOs in a dedicated table."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setSpacing(12)
+
+        # External ISO table
+        self._external_table = QTableWidget()
+        self._external_table.setColumnCount(5)
+        self._external_table.setHorizontalHeaderLabels(["Filename", "Size", "Path", "Source", "Last Modified"])
+        self._external_table.horizontalHeader().setStretchLastSection(True)
+        self._external_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._external_table.setAlternatingRowColors(True)
+        self._external_table.setStyleSheet(
+            "QTableWidget { background: " + T.BG_SECONDARY + "; color: " + T.TEXT_PRIMARY + ";"
+            " border: 1px solid " + T.BG_TERTIARY + "; border-radius: 6px; font-size: 12px; }"
+            "QHeaderView::section { background: " + T.BG_TERTIARY + "; color: " + T.TEXT_SECONDARY + ";"
+            " padding: 6px; border: none; }"
+            "QTableWidget::item { padding: 4px; }"
+        )
+        layout.addWidget(self._external_table)
+
+        # Buttons
+        btn_row = QWidget()
+        bl = QHBoxLayout(btn_row)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(8)
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setFixedSize(90, 32)
+        refresh_btn.setStyleSheet(
+            "QPushButton { background: " + T.BRAND + "; border: none; border-radius: 6px;"
+            " color: white; font-size: 12px; font-weight: 600; }"
+            "QPushButton:hover { background: " + T.BRAND_HOVER + "; }"
+        )
+        refresh_btn.clicked.connect(self._refresh_external)
+        bl.addWidget(refresh_btn)
+
+        browse_btn = QPushButton("Browse External Folder")
+        browse_btn.setFixedSize(160, 32)
+        browse_btn.setStyleSheet(
+            "QPushButton { background: " + T.STATUS_RUNNING + "; border: none; border-radius: 6px;"
+            " color: white; font-size: 12px; font-weight: 600; }"
+            "QPushButton:hover { background: #16a34a; }"
+        )
+        browse_btn.clicked.connect(self._add_source)
+        bl.addWidget(browse_btn)
+
+        remove_src_btn = QPushButton("Remove Source")
+        remove_src_btn.setFixedSize(120, 32)
+        remove_src_btn.setStyleSheet(
+            "QPushButton { background: " + T.STATUS_STOPPED + "; border: none; border-radius: 6px;"
+            " color: white; font-size: 12px; font-weight: 600; }"
+            "QPushButton:hover { background: #dc2626; }"
+        )
+        remove_src_btn.clicked.connect(self._remove_source)
+        bl.addWidget(remove_src_btn)
+
+        select_btn = QPushButton("Select for VM")
+        select_btn.setFixedSize(110, 32)
+        select_btn.setStyleSheet(
+            "QPushButton { background: " + T.STATUS_PAUSED + "; border: none; border-radius: 6px;"
+            " color: white; font-size: 12px; font-weight: 600; }"
+            "QPushButton:hover { background: #d97706; }"
+        )
+        select_btn.clicked.connect(self._select_external_iso)
+        bl.addWidget(select_btn)
+
+        bl.addStretch()
+        layout.addWidget(btn_row)
+        return page
+
+    def _refresh_external(self):
+        """Refresh the external ISOs table."""
+        isos = self._manager.scan_external_isos()
+        self._external_table.setRowCount(len(isos))
+        for i, iso in enumerate(isos):
+            self._external_table.setItem(i, 0, QTableWidgetItem(iso["name"]))
+            self._external_table.setItem(i, 1, QTableWidgetItem(iso["size_human"]))
+            path_item = QTableWidgetItem(iso["path"])
+            path_item.setToolTip(iso["path"])
+            self._external_table.setItem(i, 2, path_item)
+            source_item = QTableWidgetItem(str(iso.get("source", "external")))
+            source_item.setForeground(Qt.yellow)
+            self._external_table.setItem(i, 3, source_item)
+            modified_str = ISOManager.format_timestamp(iso["modified"])
+            self._external_table.setItem(i, 4, QTableWidgetItem(modified_str))
+
+    def _select_external_iso(self):
+        """Select an external ISO for VM creation."""
+        row = self._external_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Warning", "Select an ISO first")
+            return
+        path = self._external_table.item(row, 2).text()
+        self.iso_selected.emit(path)
+        QMessageBox.information(self, "Selected", "ISO selected:\n" + path)
 
     def _sources_tab(self) -> QWidget:
         """Tab for managing ISO sources."""
@@ -230,6 +330,9 @@ class ISOManagerPanel(QWidget):
             item = QListWidgetItem(str(source))
             item.setToolTip(str(source))
             self._sources_list.addItem(item)
+
+        # Refresh external ISOs table
+        self._refresh_external()
 
     def _import_iso(self):
         """Import an ISO into internal folder."""
