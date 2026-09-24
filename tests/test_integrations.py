@@ -178,7 +178,7 @@ class KubernetesIntegrationTest(unittest.TestCase):
             self.assertIn(pod_name, names)
 
             self.backend.delete_resource("pod", pod_name)
-            time.sleep(10)
+            time.sleep(30)
 
             pods = self.backend.list_pods()
             names = [p.get("name", "") if isinstance(p, dict) else getattr(p, "name", "") for p in pods]

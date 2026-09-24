@@ -314,7 +314,7 @@ class QEMUBackend(HypervisorBackend):
             logger.info("Started QEMU VM '%s' (PID: %d)", name, proc.pid)
 
             # Wait briefly for QMP to become available
-            await self._wait_for_qmp(name, timeout=10)
+            await self._wait_for_qmp(name, timeout=30)
         except Exception as e:
             if name in self._processes:
                 del self._processes[name]

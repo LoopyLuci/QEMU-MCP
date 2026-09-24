@@ -26,7 +26,7 @@
 
 ; Welcome page
 !insertmacro MUI_PAGE_WELCOME
-; Feature List — 34 Panels + 2 Dialogs
+; Feature List — 34 Panels + 2 Dialogs + Plugin API
 ;
 ; Panels (34):
 ;   VM Console, VM Control, VM Switcher, Multi-VM Dashboard,
@@ -40,9 +40,12 @@
 ;
 ; Dialogs (2):
 ;   Container Logs, Image Pull
+;
+; Plugin API:
+;   Extensible plugin system for custom integrations
 
 ; Components page
-!define MUI_COMPONENTSPAGE_TEXT_DESCRIPTION "VM-Harness includes 34 panels and 2 dialogs for comprehensive VM and container management."
+!define MUI_COMPONENTSPAGE_TEXT_DESCRIPTION "VM-Harness includes 34 panels, 2 dialogs, and a Plugin API for comprehensive VM and container management with extensible custom integrations."
 !insertmacro MUI_PAGE_COMPONENTS
 ; Directory page
 !insertmacro MUI_PAGE_DIRECTORY
