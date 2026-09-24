@@ -487,6 +487,18 @@ class MainWindow(QMainWindow):
     # ── System Tray ──────────────────────────────────────────────────────────
 
     def _setup_system_tray(self):
+        """Set up system tray icon. Fails gracefully in headless/offscreen environments."""
+        try:
+            if not QSystemTrayIcon.isSystemTrayAvailable():
+                import logging
+                logging.getLogger("vmharness.gui").info("System tray not available — skipping tray icon")
+                return
+            self._setup_system_tray_impl()
+        except Exception as e:
+            import logging
+            logging.getLogger("vmharness.gui").warning("System tray init failed: %s — continuing without tray", e)
+
+    def _setup_system_tray_impl(self):
         """Create system tray icon and context menu."""
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self.tray_icon = None
@@ -531,6 +543,11 @@ class MainWindow(QMainWindow):
         self.show()
         self.raise_()
         self.activateWindow()
+
+    def _tray_activated(self, reason):
+        """Handle tray icon activation — restore on double-click."""
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self._restore_from_tray()
 
     def _quit_from_tray(self):
         """Quit from tray — properly clean up."""

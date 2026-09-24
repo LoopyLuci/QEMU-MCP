@@ -402,40 +402,63 @@ class HotReloader:
         """Set callback for file changes. Receives list of changed files."""
         self._reload_callback = callback
 
-    def _scan_files(self) -> dict[Path, str]:
-        """Scan all watched files and return their hashes."""
+    def _scan_files(self) -> dict[Path, tuple[float, str]]:
+        """Scan all watched files. Returns {path: (mtime, hash)}.
+
+        Optimization: only re-hash when mtime changes. This reduces
+        CPU usage from O(n) hash/sec to O(1) stat/sec for unchanged files.
+        """
         hashes = {}
         for path in self._watch_paths:
             if path.is_file():
-                hashes[path] = self._file_hash(path)
+                try:
+                    stat = path.stat()
+                    old = self._file_hashes.get(path)
+                    if old is None or old[0] != stat.st_mtime:
+                        hashes[path] = (stat.st_mtime, self._file_hash(path))
+                    else:
+                        hashes[path] = old
+                except Exception:
+                    pass
             elif path.is_dir():
                 for f in path.rglob("*.py"):
-                    hashes[f] = self._file_hash(f)
+                    try:
+                        stat = f.stat()
+                        old = self._file_hashes.get(f)
+                        if old is None or old[0] != stat.st_mtime:
+                            hashes[f] = (stat.st_mtime, self._file_hash(f))
+                        else:
+                            hashes[f] = old
+                    except Exception:
+                        pass
         return hashes
 
     def _file_hash(self, path: Path) -> str:
-        """Compute file hash."""
+        """Compute file hash (only called when mtime changes)."""
         try:
             return hashlib.md5(path.read_bytes()).hexdigest()
         except Exception:
             return ""
 
     def _watch_loop(self):
-        """Main watch loop."""
+        """Main watch loop with mtime-based optimization."""
         while self._running:
             try:
-                current_hashes = self._scan_files()
+                current = self._scan_files()
                 changed = []
 
-                for path, hash_val in current_hashes.items():
-                    old_hash = self._file_hashes.get(path, "")
-                    if old_hash and old_hash != hash_val:
+                for path, (mtime, hash_val) in current.items():
+                    old = self._file_hashes.get(path)
+                    if old is None:
+                        changed.append(path)
+                    elif old[0] != mtime and old[1] != hash_val:
+                        # mtime changed AND content changed (not just touch)
                         changed.append(path)
 
-                # Check for new files
-                new_files = set(current_hashes.keys()) - set(self._file_hashes.keys())
+                new_files = set(current.keys()) - set(self._file_hashes.keys())
                 for path in new_files:
-                    changed.append(path)
+                    if path not in changed:
+                        changed.append(path)
 
                 if changed and time.time() - self._last_reload > self._debounce:
                     self._last_reload = time.time()
@@ -446,7 +469,7 @@ class HotReloader:
                         except Exception as e:
                             logger.error("Reload callback failed: %s", e)
 
-                self._file_hashes = current_hashes
+                self._file_hashes = current
 
             except Exception as e:
                 logger.error("HotReloader error: %s", e)

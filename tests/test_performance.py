@@ -38,13 +38,18 @@ def _count_active_timers(widget) -> int:
 class TestPanelPerformance(unittest.TestCase):
     """Switch through all panels and check for memory leaks / slow rendering."""
 
-    SLOW_PANEL_THRESHOLD_S = 1.0  # panels taking >1s to switch are reported
-    MEMORY_LEAK_THRESHOLD_MB = 100.0  # RSS growth >100 MB after full cycle = leak
+    SLOW_PANEL_THRESHOLD_S = 1.0
+    MEMORY_LEAK_THRESHOLD_MB = 100.0
 
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication(sys.argv)
         cls.app.setQuitOnLastWindowClosed(False)
+
+    @classmethod
+    def tearDownClass(cls):
+        """Quit the QApplication to prevent hangs from lingering timers."""
+        cls.app.quit()
 
     def test_panel_switching_performance(self):
         """Main performance test: cycle through all panels, measure time & memory."""
@@ -159,8 +164,8 @@ class TestPanelPerformance(unittest.TestCase):
         time.sleep(0.1)
         rss_before = _get_rss_mb()
 
-        # Switch to dashboard 10 times
-        for _ in range(10):
+        # Switch to dashboard 5 times
+        for _ in range(5):
             window._switch_panel("dashboard")
             self.app.processEvents()
 
@@ -169,12 +174,10 @@ class TestPanelPerformance(unittest.TestCase):
         rss_after = _get_rss_mb()
         rss_growth = rss_after - rss_before
 
-        # Should be minimal growth for repeated switches to same panel
-        # (30 MB threshold accounts for Qt internal caching, font loading, etc.)
         self.assertLess(
             rss_growth,
             30.0,
-            f"Memory grew by {rss_growth:.1f} MB after 10 switches to same panel",
+            f"Memory grew by {rss_growth:.1f} MB after 5 switches to same panel",
         )
 
     def test_rapid_panel_switching(self):

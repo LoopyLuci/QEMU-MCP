@@ -26,26 +26,28 @@
 
 ; Welcome page
 !insertmacro MUI_PAGE_WELCOME
+
 ; Feature List — 34 Panels + 2 Dialogs + Plugin API
-;
-; Panels (34):
-;   VM Console, VM Control, VM Switcher, Multi-VM Dashboard,
-;   K8s Tree, K8s Editor, Container, Container Stats, Container Terminal,
-;   CPU Control, Display, Guest Agent, Guest Terminal,
-;   ISO Manager, Logs, Monitoring, Network,
-;   Pairing, AI Providers, QEMU, QMP Console,
-;   Security, Settings, Snapshot, Storage,
-;   SysInfo, Telemetry, Troubleshoot, USB Device,
-;   Automation, Chat, Dashboard, Audit Log, VMware/VBox
-;
+; 
+; VM Panels: VM Console, VM Control, VM Switcher, Multi-VM Dashboard
+; Hypervisor: QEMU, QMP Console, VMware/VirtualBox
+; Container: Container, Container Stats, Container Terminal, Container Logs
+; K8s: K8s Tree, K8s Editor
+; System: CPU Control, Display, Guest Agent, Guest Terminal, USB Device
+; Storage: ISO Manager, Snapshot, Storage
+; Network: Network, Security
+; Monitor: Logs, Monitoring, Telemetry, SysInfo, Audit Log
+; Management: Settings, Troubleshoot, Automation, Chat
+; Integration: Pairing, AI Providers, Dashboard
+; 
 ; Dialogs (2):
-;   Container Logs, Image Pull
+;   Container Logs Dialog, Image Pull Dialog
 ;
 ; Plugin API:
 ;   Extensible plugin system for custom integrations
 
 ; Components page
-!define MUI_COMPONENTSPAGE_TEXT_DESCRIPTION "VM-Harness includes 34 panels, 2 dialogs, and a Plugin API for comprehensive VM and container management with extensible custom integrations."
+!define MUI_COMPONENTSPAGE_TEXT_DESCRIPTION "VM-Harness v2.0.0 — 34 panels, 2 dialogs, Plugin API. Full VM, container, Kubernetes, and hypervisor management suite."
 !insertmacro MUI_PAGE_COMPONENTS
 ; Directory page
 !insertmacro MUI_PAGE_DIRECTORY
