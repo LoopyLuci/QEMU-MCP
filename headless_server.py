@@ -9,7 +9,7 @@ import ssl
 import sys
 import json
 import subprocess
-n# Suppress CLI console windows on Windows
+# Suppress CLI console windows on Windows
 CREATE_NO_WINDOW = 0x08000000
 import time
 from pathlib import Path

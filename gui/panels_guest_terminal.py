@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QFileDialog,
     QSizePolicy,
+    QTreeWidgetItem,
 )
 
 from gui.widgets import Card, TerminalOutput, FileTree, TextInput
@@ -199,7 +200,6 @@ class GuestTerminalPanel(QWidget):
         """)
         file_toolbar_layout.addWidget(self.upload_btn)
 
-        file_toolbar_layout.addWidget(self.upload_btn)
         file_toolbar_layout.addStretch()
 
         self.refresh_files_btn = QPushButton("↻ Refresh")
@@ -328,30 +328,12 @@ class GuestTerminalPanel(QWidget):
     def _refresh_files(self):
         """List guest directory via SSH bridge."""
         if self._ssh_bridge:
-            self._ssh_bridge.list_dir("/home/omarchyvm")
+            self._ssh_bridge.list_dir(self.nav_path.text() or "/home/omarchyvm")
         else:
             # Fallback to sample data for demo
             self._populate_sample_files()
 
-    def _simulate_output(self, cmd: str):
-        """Simulate command output for demo."""
-        outputs = {
-            "ls": "omarchyvm  Documents  Downloads  Projects  .bashrc  .profile",
-            "ls -la": "total 48\ndrwxr-xr-x 6 omarchyvm omarchyvm 4096 Jan 1 12:00 .\ndrwxr-xr-x 3 root       root       4096 Jan 1 11:00 ..\n-rw-r--r-- 1 omarchyvm omarchyvm  220 Jan 1 11:00 .bashrc\n-rw-r--r-- 1 omarchyvm omarchyvm  807 Jan 1 11:00 .profile\ndrwxr-xr-x 2 omarchyvm omarchyvm 4096 Jan 1 12:00 Documents\ndrwxr-xr-x 2 omarchyvm omarchyvm 4096 Jan 1 12:00 Downloads",
-            "pwd": "/home/omarchyvm",
-            "whoami": "omarchyvm",
-            "uname -a": "Linux omarchy-vm 6.1.0-00005-x86_64 #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux",
-            "df -h": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/vda1       64G  6.6G   58G  11% /\n tmpfs           8.0G     0  8.0G   0% /dev/shm",
-            "free -m": "              total        used        free      shared  buff/cache   available\nMem:         16384        2048       10240         128        4096       14080\nSwap:         4096           0        4096",
-            "uptime": " 12:05:32 up 2:34,  1 user,  load average: 0.08, 0.03, 0.01",
-        }
-
-        if cmd in outputs:
-            self.terminal.append_output(outputs[cmd])
-        else:
-            self.terminal.append_output(f"Command '{cmd}' executed (simulated output).")
-
-    def _refresh_files(self):
+    def _populate_sample_files(self):
         """Populate the file tree with sample guest files."""
         sample_files = [
             {"name": "home", "type": "dir", "path": "/home", "size": "", "mtime": "2026-01-01 12:00"},
@@ -367,12 +349,18 @@ class GuestTerminalPanel(QWidget):
         self.nav_path.setText("/home/omarchyvm")
 
     def _on_upload(self):
-        """Handle file upload."""
+        """Upload a file to the guest via SSH bridge."""
         path, _ = QFileDialog.getOpenFileName(self, "Upload File to Guest", "", "All Files (*)")
         if path:
             self.terminal.append_line(f"Uploading: {path}...", "COMMAND")
-            # Simulate upload
-            QTimer.singleShot(1000, lambda: self.terminal.append_line(f"Upload complete: {path} → /home/omarchyvm/", "OUTPUT"))
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    content = fh.read()
+                guest_path = "/home/omarchyvm/" + path.split("/")[-1]
+                self._ssh_bridge.write_file(guest_path, content)
+                self.terminal.append_line(f"Upload complete: {path} → {guest_path}", "OUTPUT")
+            except Exception as e:
+                self.terminal.append_line(f"Upload failed: {e}", "ERROR")
 
     def set_ssh_bridge(self, bridge: Any) -> None:
         """Connect to SSH bridge for real commands and file operations."""
@@ -437,40 +425,20 @@ class GuestTerminalPanel(QWidget):
                 child.setFlags(child.flags() | Qt.ItemIsAutoTristate)
         self.file_tree.expandAll()
 
-    def _populate_sample_files(self):
-        """Fallback sample file listing when SSH bridge not available."""
-        sample_files = [
-            {"name": "home", "type": "dir", "path": "/home", "size": "", "mtime": "2026-01-01 12:00"},
-            {"name": "omarchyvm", "type": "dir", "path": "/home/omarchyvm", "size": "", "mtime": "2026-01-01 12:00"},
-            {"name": ".bashrc", "type": "file", "path": "/home/omarchyvm/.bashrc", "size": "220 B", "mtime": "2026-01-01 11:00"},
-            {"name": ".profile", "type": "file", "path": "/home/omarchyvm/.profile", "size": "807 B", "mtime": "2026-01-01 11:00"},
-            {"name": "Documents", "type": "dir", "path": "/home/omarchyvm/Documents", "size": "", "mtime": "2026-01-01 12:00"},
-            {"name": "Downloads", "type": "dir", "path": "/home/omarchyvm/Downloads", "size": "", "mtime": "2026-01-01 12:00"},
-            {"name": "Projects", "type": "dir", "path": "/home/omarchyvm/Projects", "size": "", "mtime": "2026-01-01 12:00"},
-            {"name": "README.md", "type": "file", "path": "/home/omarchyvm/README.md", "size": "1.2 KB", "mtime": "2026-01-01 12:05"},
-        ]
-        self._populate_file_tree(sample_files)
-        self.nav_path.setText("/home/omarchyvm")
+    def _simulate_output(self, cmd: str):
+        """Simulate command output for demo."""
+        outputs = {
+            "ls": "omarchyvm  Documents  Downloads  Projects  .bashrc  .profile",
+            "ls -la": "total 48\ndrwxr-xr-x 6 omarchyvm omarchyvm 4096 Jan 1 12:00 .\ndrwxr-xr-x 3 root       root       4096 Jan 1 11:00 ..\n-rw-r--r-- 1 omarchyvm omarchyvm  220 Jan 1 11:00 .bashrc\n-rw-r--r-- 1 omarchyvm omarchyvm  807 Jan 1 11:00 .profile\ndrwxr-xr-x 2 omarchyvm omarchyvm 4096 Jan 1 12:00 Documents\ndrwxr-xr-x 2 omarchyvm omarchyvm 4096 Jan 1 12:00 Downloads",
+            "pwd": "/home/omarchyvm",
+            "whoami": "omarchyvm",
+            "uname -a": "Linux omarchy-vm 6.1.0-00005-x86_64 #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux",
+            "df -h": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/vda1       64G  6.6G   58G  11% /\n tmpfs           8.0G     0  8.0G   0% /dev/shm",
+            "free -m": "              total        used        free      shared  buff/cache   available\nMem:         16384        2048       10240         128        4096       14080\nSwap:         4096           0        4096",
+            "uptime": " 12:05:32 up 2:34,  1 user,  load average: 0.08, 0.03, 0.01",
+        }
 
-    def _on_upload(self):
-        """Upload a file to the guest via SSH bridge."""
-        path, _ = QFileDialog.getOpenFileName(self, "Upload File to Guest", "", "All Files (*)")
-        if path:
-            self.terminal.append_line(f"Uploading: {path}...", "COMMAND")
-            # Read file content and write via SSH
-            try:
-                content = open(path, "r", encoding="utf-8").read()
-                guest_path = "/home/omarchyvm/" + path.split("/")[-1]
-                self._ssh_bridge.write_file(guest_path, content)
-                self.terminal.append_line(f"Upload complete: {path} → {guest_path}", "OUTPUT")
-            except Exception as e:
-                self.terminal.append_line(f"Upload failed: {e}", "ERROR")
-
-    def _on_file_select(self, path: str):
-        """Handle file double-click in tree."""
-        if path.endswith("/"):
-            self.nav_path.setText(path.rstrip("/"))
-            self._ssh_bridge.list_dir(path)
+        if cmd in outputs:
+            self.terminal.append_output(outputs[cmd])
         else:
-            self.terminal.append_line(f"Selected: {path}", "OUTPUT")
-            self.terminal.append_line("Use Download button to retrieve this file.", "INFO")
+            self.terminal.append_output(f"Command '{cmd}' executed (simulated output).")

@@ -910,24 +910,24 @@ class MainWindow(QMainWindow):
 
     def _on_ssh_command_output(self, output: str):
         """Send command output to guest terminal."""
-        panel = self.panels.get("guestterminal")
+        panel = self.panels.get("guest_terminal")
         if panel and hasattr(panel, "append_command_output"):
             panel.append_command_output(output)
 
     def _on_ssh_file_content(self, content: str):
         """Send file content to guest terminal."""
-        panel = self.panels.get("guestterminal")
+        panel = self.panels.get("guest_terminal")
         if panel and hasattr(panel, "append_file_content"):
             panel.append_file_content(content)
 
     def _on_ssh_file_list(self, files: list):
         """Send file listing to guest terminal."""
-        panel = self.panels.get("guestterminal")
+        panel = self.panels.get("guest_terminal")
         if panel and hasattr(panel, "populate_files"):
             panel.populate_files(files)
 
     def _on_ssh_error(self, message: str):
-        panel = self.panels.get("guestterminal")
+        panel = self.panels.get("guest_terminal")
         if panel and hasattr(panel, "append_error"):
             panel.append_error(message)
 

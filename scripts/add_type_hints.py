@@ -17,7 +17,7 @@ import ast
 import os
 import re
 import subprocess
-n# Suppress CLI console windows on Windows
+# Suppress CLI console windows on Windows
 CREATE_NO_WINDOW = 0x08000000
 import sys
 from pathlib import Path

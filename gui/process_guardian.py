@@ -10,7 +10,7 @@ import os
 import shutil
 import signal
 import subprocess
-n# Suppress CLI console windows on Windows
+# Suppress CLI console windows on Windows
 CREATE_NO_WINDOW = 0x08000000
 import sys
 import threading
@@ -85,7 +85,8 @@ class ProcessGuardian:
             env = os.environ.copy()
             env["VM_HARNESS_ROLE"] = "primary"
             self._primary_process = subprocess.Popen(
-                args,
+                [sys.executable, self._main_script],
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

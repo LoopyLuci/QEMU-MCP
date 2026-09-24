@@ -28,7 +28,7 @@ import json
 import os
 import shutil
 import subprocess
-n# Suppress CLI console windows on Windows
+# Suppress CLI console windows on Windows
 CREATE_NO_WINDOW = 0x08000000
 from dataclasses import dataclass, field
 from datetime import datetime
