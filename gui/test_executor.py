@@ -11,6 +11,8 @@ import logging
 import os
 import re
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 import time
 from dataclasses import dataclass, field
 from datetime import datetime

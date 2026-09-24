@@ -9,6 +9,8 @@ import ssl
 import sys
 import json
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 import time
 from pathlib import Path
 from typing import Any, Callable, Coroutine
@@ -230,7 +232,7 @@ class HeadlessServer(QMCMApiServer):
         if not os.path.exists(disk_path):
             qemu_img = os.path.join(os.path.dirname(DEFAULT_QEMU_BINARY), 'qemu-img.exe')
             try:
-                subprocess.run([qemu_img, 'create', '-f', 'qcow2', disk_path, f'{disk_size_gb}G'], capture_output=True, timeout=30)
+                subprocess.run([qemu_img, 'create', '-f', 'qcow2', disk_path, f'{disk_size_gb}G'], capture_output=True, timeout=30, creationflags=CREATE_NO_WINDOW)
             except Exception as e:
                 return self._json({"error": f"disk_create_failed: {e}"}, status=500)
         ok, msg = self._vm_manager.add_vm(name, {'disk_path': disk_path, 'ram_mb': ram_mb, 'cpus': cpus, 'display': 'none'})
@@ -305,7 +307,7 @@ class HeadlessServer(QMCMApiServer):
         if disk_path and os.path.exists(disk_path):
             qemu_img = os.path.join(os.path.dirname(DEFAULT_QEMU_BINARY), 'qemu-img.exe')
             try:
-                result = subprocess.run([qemu_img, 'snapshot', '-l', disk_path], capture_output=True, text=True, timeout=10)
+                result = subprocess.run([qemu_img, 'snapshot', '-l', disk_path], capture_output=True, text=True, timeout=10, creationflags=CREATE_NO_WINDOW)
                 for line in result.stdout.strip().split('\n'):
                     parts = line.split()
                     if len(parts) >= 2:
@@ -328,7 +330,7 @@ class HeadlessServer(QMCMApiServer):
         if disk_path and os.path.exists(disk_path):
             qemu_img = os.path.join(os.path.dirname(DEFAULT_QEMU_BINARY), 'qemu-img.exe')
             try:
-                result = subprocess.run([qemu_img, 'snapshot', '-c', snap_name, disk_path], capture_output=True, text=True, timeout=10)
+                result = subprocess.run([qemu_img, 'snapshot', '-c', snap_name, disk_path], capture_output=True, text=True, timeout=10, creationflags=CREATE_NO_WINDOW)
                 if result.returncode != 0:
                     return self._json({"error": result.stderr}, status=500)
             except Exception as e:
@@ -347,7 +349,7 @@ class HeadlessServer(QMCMApiServer):
         if disk_path and os.path.exists(disk_path):
             qemu_img = os.path.join(os.path.dirname(DEFAULT_QEMU_BINARY), 'qemu-img.exe')
             try:
-                result = subprocess.run([qemu_img, 'snapshot', '-a', snap_name, disk_path], capture_output=True, text=True, timeout=10)
+                result = subprocess.run([qemu_img, 'snapshot', '-a', snap_name, disk_path], capture_output=True, text=True, timeout=10, creationflags=CREATE_NO_WINDOW)
                 if result.returncode != 0:
                     return self._json({"error": result.stderr}, status=500)
             except Exception as e:
@@ -405,7 +407,7 @@ def ensure_test_vm(manager: MultiVMManager) -> None:
     os.makedirs(os.path.dirname(disk_path), exist_ok=True)
     if not os.path.exists(disk_path):
         qemu_img = os.path.join(os.path.dirname(qemu_bin), 'qemu-img.exe')
-        subprocess.run([qemu_img, 'create', '-f', 'qcow2', disk_path, '1G'], capture_output=True)
+        subprocess.run([qemu_img, 'create', '-f', 'qcow2', disk_path, '1G'], capture_output=True, creationflags=CREATE_NO_WINDOW)
         print(f"Created test disk: {disk_path}")
     ok, msg = manager.add_vm('test-vm', {'qemu_binary': qemu_bin, 'disk_path': disk_path, 'ram_mb': 512, 'cpus': 1, 'display': 'none'})
     print(f"Test VM: {ok} {msg}")

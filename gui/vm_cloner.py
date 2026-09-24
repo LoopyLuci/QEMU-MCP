@@ -28,6 +28,8 @@ import json
 import os
 import shutil
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -181,7 +183,7 @@ class CloneWorker(QThread):
         # Get info to verify
         self.progress.emit(90, "Verifying clone...")
         info_cmd = [self._qemu_img, "info", self._dest]
-        subprocess.run(info_cmd, capture_output=True, text=True, check=True)
+        subprocess.run(info_cmd, capture_output=True, text=True, check=True, creationflags=CREATE_NO_WINDOW)
 
     def _do_full_clone(self):
         """Create a full independent clone (convert)."""
@@ -368,7 +370,7 @@ class VMCloner:
             new_path,
         ]
         self._progress_cb(20, "Creating overlay...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, creationflags=CREATE_NO_WINDOW)
         if result.returncode != 0:
             return False, f"qemu-img error: {result.stderr}"
         self._progress_cb(100, "Done")
@@ -392,7 +394,7 @@ class VMCloner:
             dest_path,
         ]
         self._progress_cb(20, "Converting...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, creationflags=CREATE_NO_WINDOW)
         if result.returncode != 0:
             return False, f"qemu-img error: {result.stderr}"
         self._progress_cb(100, "Done")
@@ -401,7 +403,7 @@ class VMCloner:
     def get_disk_info(self, disk_path: str) -> dict[str, Any]:
         """Get disk image info via qemu-img info."""
         cmd = [self._qemu_img, "info", "--output=json", disk_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, creationflags=CREATE_NO_WINDOW)
         if result.returncode != 0:
             return {"error": result.stderr}
         try:

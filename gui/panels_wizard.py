@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 from pathlib import Path
 
 from gui.theme import T

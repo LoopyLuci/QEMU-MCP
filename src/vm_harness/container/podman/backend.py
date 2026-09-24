@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 from typing import Any, List, Optional, Union
 
 from vm_harness.container.backend import (

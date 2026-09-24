@@ -10,6 +10,8 @@ import os
 import shutil
 import signal
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 import sys
 import threading
 import time
@@ -83,10 +85,11 @@ class ProcessGuardian:
             env = os.environ.copy()
             env["VM_HARNESS_ROLE"] = "primary"
             self._primary_process = subprocess.Popen(
-                [sys.executable, self._main_script],
-                env=env,
+                args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                text=True,
+                creationflags=CREATE_NO_WINDOW,
             )
             logger.info("Primary process started (PID %d)", self._primary_process.pid)
         except Exception as e:

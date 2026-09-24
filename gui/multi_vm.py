@@ -15,6 +15,7 @@ import os
 import re
 import socket
 import subprocess
+CREATE_NO_WINDOW = 0x08000000
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -464,7 +465,7 @@ class MultiVMManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+                creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
             self._running[name] = proc
             config.status = "running"

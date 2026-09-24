@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 
 from gui.theme import T
 from PyQt5.QtCore import Qt

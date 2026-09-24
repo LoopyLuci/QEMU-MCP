@@ -20,6 +20,8 @@ import platform
 import re
 import shutil
 import subprocess
+n# Suppress CLI console windows on Windows
+CREATE_NO_WINDOW = 0x08000000
 from datetime import datetime
 from pathlib import Path
 from typing import Any
