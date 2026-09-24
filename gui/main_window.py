@@ -534,7 +534,6 @@ class MainWindow(QMainWindow):
 
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self._tray_activated)
-        self.tray_icon.messageClicked.connect(self._restore_from_tray)
         self.tray_icon.show()
 
     def _restore_from_tray(self):
@@ -545,8 +544,8 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def _tray_activated(self, reason):
-        """Handle tray icon activation — restore on double-click."""
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        """Handle tray icon activation — only restore on double-click."""
+        if reason == QSystemTrayIcon.DoubleClick:
             self._restore_from_tray()
 
     def _quit_from_tray(self):

@@ -7,6 +7,41 @@ Full resilience: crash handler, atomic state, hot reload, failover, self-healing
 
 from __future__ import annotations
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CRITICAL: Suppress ALL CLI console windows on Windows
+# Monkeypatch subprocess BEFORE any other imports
+# ═══════════════════════════════════════════════════════════════════════════════
+import os
+import sys
+if sys.platform == "win32":
+    import subprocess as _subprocess
+    _CREATE_NO_WINDOW = 0x08000000
+    _SW_HIDE = 0
+
+    _orig_popen_init = _subprocess.Popen.__init__
+    def _Popen_init_no_window(self, *args, **kwargs):
+        kwargs.setdefault("creationflags", _CREATE_NO_WINDOW)
+        si = _subprocess.STARTUPINFO()
+        si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = _SW_HIDE
+        kwargs.setdefault("startupinfo", si)
+        _orig_popen_init(self, *args, **kwargs)
+    _subprocess.Popen.__init__ = _Popen_init_no_window
+
+    _orig_run = _subprocess.run
+    def _run_no_window(*args, **kwargs):
+        kwargs.setdefault("creationflags", _CREATE_NO_WINDOW)
+        si = _subprocess.STARTUPINFO()
+        si.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = _SW_HIDE
+        kwargs.setdefault("startupinfo", si)
+        return _orig_run(*args, **kwargs)
+    _subprocess.run = _run_no_window
+
+    for _name in ("call", "check_call", "check_output"):
+        _orig = getattr(_subprocess, _name)
+        setattr(_subprocess, _name, lambda *a, _o=_orig, **kw: _o(*a, **{**kw, "creationflags": kw.get("creationflags", _CREATE_NO_WINDOW)}))
+
 import argparse
 import atexit
 import asyncio
