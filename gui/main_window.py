@@ -526,10 +526,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.show()
 
     def _restore_from_tray(self):
-        """Restore window from system tray — ensure taskbar entry returns."""
-        # Remove Tool flag so window appears in taskbar again
-        flags = (self.windowFlags() & ~Qt.Tool) | Qt.Window | Qt.CustomizeWindowHint
-        self.setWindowFlags(flags)
+        """Restore window from system tray."""
         self.showNormal()
         self.show()
         self.raise_()
@@ -540,46 +537,30 @@ class MainWindow(QMainWindow):
         self._save_state()
         if self.tray_icon:
             self.tray_icon.hide()
-        # Stop timers but don't stop bridges — they should keep running
-        # for the headless server
-        self._telemetry_timer.stop()
-        self._reconnect_timer.stop()
+        # Stop timers
+        if hasattr(self, '_telemetry_timer'):
+            self._telemetry_timer.stop()
+        if hasattr(self, '_reconnect_timer'):
+            self._reconnect_timer.stop()
         QApplication.quit()
 
-    def _tray_activated(self, reason):
-        """Handle tray icon click — restore on double click."""
-        if reason == QSystemTrayIcon.DoubleClick:
-            self._restore_from_tray()
-        elif reason == QSystemTrayIcon.Trigger:
-            # Single click also restores
-            self._restore_from_tray()
-
     def closeEvent(self, event):
-        """Clean up on close — minimize to tray with NO taskbar icon."""
-        # Save window state for next launch
+        """Clean up on close — minimize to tray."""
         self._save_state()
-        # Unload plugins
         if hasattr(self, 'plugin_manager'):
             self.plugin_manager.unload_all()
-        # Release resize grips
         if hasattr(self, '_grips'):
             for grip in self._grips:
                 grip.releaseMouse()
                 grip.deleteLater()
             self._grips.clear()
-        # Minimize to tray — remove from taskbar entirely
+        # Minimize to tray
         if self.tray_icon and self.tray_icon.isVisible():
             event.ignore()
-            # Use setWindowFlags + hide to suppress taskbar entry
-            self.setWindowFlags(self.windowFlags() | Qt.Tool)
-            self.show()
             self.hide()
-            # Restore flags for when user restores
-            flags = (self.windowFlags() & ~Qt.Tool)
-            self.setWindowFlags(flags | Qt.Window | Qt.CustomizeWindowHint)
             self.tray_icon.showMessage(
                 "VM-Harness",
-                "Minimized to tray. No taskbar icon. Right-click tray icon to restore.",
+                "Minimized to tray. Click tray icon to restore.",
                 QSystemTrayIcon.Information,
                 3000,
             )
