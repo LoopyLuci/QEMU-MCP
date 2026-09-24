@@ -50,36 +50,52 @@ MAX_HEIGHT = 1080
 # ── Docker exec subprocess pool ───────────────────────────────────────────────
 
 class DockerExecSession:
-    """Manages a docker exec subprocess for terminal access."""
+    """Manages a docker exec subprocess for terminal access.
+
+    Uses a background thread for blocking I/O so the async event loop
+    is never blocked.
+    """
 
     def __init__(self, container_name: str, shell: str = "/bin/sh"):
         self.container_name = container_name
         self.shell = shell
         self.process: Optional[subprocess.Popen] = None
         self.output_callbacks: List[Callable] = []
-        self._reader_thread: Optional[threading.Thread] = None
         self._running = False
         self._output_queue: queue.Queue = queue.Queue()
+        self._reader_thread: Optional[threading.Thread] = None
 
-    def start(self):
-        """Start docker exec subprocess."""
+    async def start(self, command: str = ""):
+        """Start docker exec subprocess in a thread."""
+        loop = asyncio.get_event_loop()
         try:
-            self.process = subprocess.Popen(
-                ["docker", "exec", "-it", self.container_name, self.shell],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=0,
-                universal_newlines=True,
-            )
+            self.process = await loop.run_in_executor(None, self._start_process, command)
             self._running = True
             self._reader_thread = threading.Thread(target=self._read_output, daemon=True)
             self._reader_thread.start()
         except Exception as e:
             log.error(f"Failed to start docker exec for {self.container_name}: {e}")
+            raise
+
+    def _start_process(self, command: str = "") -> subprocess.Popen:
+        """Start the docker exec process (blocking, run in executor)."""
+        if command:
+            cmd = ["docker", "exec", self.container_name, "/bin/sh", "-c", command]
+            stdin = subprocess.DEVNULL
+        else:
+            cmd = ["docker", "exec", self.container_name, "/bin/sh"]
+            stdin = subprocess.PIPE
+        return subprocess.Popen(
+            cmd,
+            stdin=stdin,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=0,
+            universal_newlines=True,
+        )
 
     def _read_output(self):
-        """Read output from subprocess."""
+        """Read output from subprocess in background thread."""
         if not self.process or not self.process.stdout:
             return
         while self._running and self.process.poll() is None:
@@ -92,7 +108,7 @@ class DockerExecSession:
             except Exception:
                 break
 
-    def write(self, data: str):
+    async def write(self, data: str):
         """Write to subprocess stdin."""
         if self.process and self.process.stdin:
             try:
@@ -101,24 +117,14 @@ class DockerExecSession:
             except Exception:
                 pass
 
-    def resize(self, cols: int, rows: int):
-        """Resize terminal (Unix only)."""
-        if self.process and self.process.stdin:
-            try:
-                import fcntl, termios, struct
-                fcntl.ioctl(self.process.stdin.fileno(), termios.TIOCSWINSZ,
-                           struct.pack("HHHH", rows, cols, 0, 0))
-            except Exception:
-                pass
-
-    def get_output(self, timeout: float = 0.1) -> Optional[str]:
+    async def get_output(self, timeout: float = 0.1) -> Optional[str]:
         """Get output from queue (non-blocking)."""
         try:
-            return self._output_queue.get(timeout=timeout)
+            return self._output_queue.get_nowait()
         except queue.Empty:
             return None
 
-    def stop(self):
+    async def stop(self):
         """Stop subprocess."""
         self._running = False
         if self.process:
@@ -135,24 +141,33 @@ class ExecSessionManager:
     def __init__(self):
         self._sessions: Dict[str, DockerExecSession] = {}
 
-    def get_or_create(self, container_name: str) -> DockerExecSession:
+    async def get_or_create(self, container_name: str, command: str = "") -> DockerExecSession:
         """Get existing session or create new one."""
         if container_name not in self._sessions:
             session = DockerExecSession(container_name)
-            session.start()
+            await session.start(command=command)
             self._sessions[container_name] = session
         return self._sessions[container_name]
 
-    def close(self, container_name: str):
+    async def execute_command(self, container_name: str, command: str) -> str:
+        """Execute a single command in a container and return output."""
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: subprocess.run(
+            ["docker", "exec", container_name, "/bin/sh", "-c", command],
+            capture_output=True, text=True, timeout=30,
+        ))
+        return result.stdout
+
+    async def close(self, container_name: str):
         """Close a session."""
         if container_name in self._sessions:
-            self._sessions[container_name].stop()
+            await self._sessions[container_name].stop()
             del self._sessions[container_name]
 
-    def close_all(self):
+    async def close_all(self):
         """Close all sessions."""
         for name in list(self._sessions.keys()):
-            self.close(name)
+            await self.close(name)
 
 
 # Global exec session manager
@@ -456,6 +471,7 @@ class StreamingBridge:
         self.capture.stop()
         for client in list(self.clients.values()):
             await client.ws.close()
+        await exec_sessions.close_all()
     
     async def _handle_terminal_ws(self, request: web.Request) -> web.WebSocketResponse:
         """WebSocket endpoint for Docker container terminal access.
@@ -471,10 +487,6 @@ class StreamingBridge:
         await ws.prepare(request)
         log.info(f"Terminal WebSocket connected for container: {container_name}")
 
-        # Get or create exec session
-        session = exec_sessions.get_or_create(container_name)
-
-        # Poll queue and send output to WebSocket
         try:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
@@ -482,22 +494,17 @@ class StreamingBridge:
                         data = json.loads(msg.data)
                         command = data.get("command", "")
                         if command:
-                            session.write(command)
+                            # Execute command and send output
+                            output = await exec_sessions.execute_command(container_name, command)
+                            try:
+                                await ws.send_str(json.dumps({"output": output}))
+                            except Exception:
+                                break
                     except json.JSONDecodeError:
                         pass
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     log.error(f"Terminal WebSocket error: {ws.exception()}")
                     break
-
-                # Poll for output (non-blocking)
-                while True:
-                    output = session.get_output(timeout=0.05)
-                    if output is None:
-                        break
-                    try:
-                        await ws.send_str(json.dumps({"output": output}))
-                    except Exception:
-                        break
         finally:
             log.info(f"Terminal WebSocket disconnected for container: {container_name}")
 

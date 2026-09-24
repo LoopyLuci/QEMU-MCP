@@ -63,8 +63,10 @@ class _PullWorker(QThread):
             return
 
         try:
-            # stream=True returns a generator of JSON dicts (one per event)
-            stream = client.images.pull(self._image_name, stream=True, decode=True)
+            # Use the low-level API — client.images.pull() no longer supports
+            # stream=True in docker-py 7.x.  client.api.pull() returns a
+            # generator of JSON dicts (one per event).
+            stream = client.api.pull(self._image_name, stream=True, decode=True)
 
             last_pct = 0
 

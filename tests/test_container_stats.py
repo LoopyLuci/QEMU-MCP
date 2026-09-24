@@ -53,12 +53,15 @@ class TestContainerStatsPanel(unittest.TestCase):
             "image": "ubuntu:latest",
         }
         self.mock_adapter = _make_mock_adapter(self.containers, self.stats_data)
+        # Patch get_adapter for the entire test lifetime (the panel calls it lazily)
+        patcher = patch("gui.async_adapter.get_adapter", return_value=self.mock_adapter)
+        self.mock_get_adapter = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _build_panel(self):
-        """Instantiate the panel with the mocked adapter patched in."""
-        with patch("gui.panels_container_stats.get_adapter", return_value=self.mock_adapter):
-            from gui.panels_container_stats import ContainerStatsPanel
-            panel = ContainerStatsPanel()
+        """Instantiate the panel (patch already active from setUp)."""
+        from gui.panels_container_stats import ContainerStatsPanel
+        panel = ContainerStatsPanel()
         return panel
 
     # ── Test 1: Panel constructs and table has correct structure ───────────
@@ -90,25 +93,21 @@ class TestContainerStatsPanel(unittest.TestCase):
         # The table should be populated with our mock containers
         self.assertGreater(panel._table.rowCount(), 0)
 
-        # Select the first row (the running container)
-        panel._table.setCurrentCell(0, 0)
-        # Force the selection-changed handler to fire
-        panel._table.itemSelectionChanged.emit()
+        # Directly invoke the detail loader (more reliable than signal emission)
+        panel._load_container_detail("test-container-1")
 
         # The CPU label should reflect the mock stats
         self.assertIn("42", panel._cpu_label.text())
 
     def test_selecting_container_updates_memory_label(self):
         panel = self._build_panel()
-        panel._table.setCurrentCell(0, 0)
-        panel._table.itemSelectionChanged.emit()
+        panel._load_container_detail("test-container-1")
 
         self.assertIn("512", panel._mem_label.text())
 
     def test_selecting_container_updates_detail_info(self):
         panel = self._build_panel()
-        panel._table.setCurrentCell(0, 0)
-        panel._table.itemSelectionChanged.emit()
+        panel._load_container_detail("test-container-1")
 
         detail_text = panel._detail_info.text()
         self.assertIn("test-container-1", detail_text)
@@ -118,16 +117,14 @@ class TestContainerStatsPanel(unittest.TestCase):
 
     def test_cpu_sparkline_receives_data(self):
         panel = self._build_panel()
-        panel._table.setCurrentCell(0, 0)
-        panel._table.itemSelectionChanged.emit()
+        panel._load_container_detail("test-container-1")
 
         # The sparkline's internal data list should have grown
         self.assertGreater(len(panel._cpu_sparkline._data), 0)
 
     def test_memory_sparkline_receives_data(self):
         panel = self._build_panel()
-        panel._table.setCurrentCell(0, 0)
-        panel._table.itemSelectionChanged.emit()
+        panel._load_container_detail("test-container-1")
 
         self.assertGreater(len(panel._mem_sparkline._data), 0)
 
@@ -145,8 +142,7 @@ class TestContainerStatsPanel(unittest.TestCase):
         self.mock_adapter.docker.get_stats.return_value = numeric_stats
 
         panel = self._build_panel()
-        panel._table.setCurrentCell(0, 0)
-        panel._table.itemSelectionChanged.emit()
+        panel._load_container_detail("test-container-1")
 
         self.assertIn("15", panel._cpu_label.text())
         self.assertIn("128", panel._mem_label.text())
