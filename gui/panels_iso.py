@@ -308,7 +308,7 @@ class ISOManagerPanel(QWidget):
         layout.addStretch()
         return page
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh ISO list."""
         isos = self._manager.scan_isos()
         self._iso_table.setRowCount(len(isos))

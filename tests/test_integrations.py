@@ -151,10 +151,37 @@ class KubernetesIntegrationTest(unittest.TestCase):
         nodes = self.backend.list_nodes()
         self.assertIsInstance(nodes, list)
 
+    def _pod_exists(self, pod_name):
+        """Check if a pod currently exists."""
+        pods = self.backend.list_pods()
+        names = [p.get("name", "") if isinstance(p, dict) else getattr(p, "name", "") for p in pods]
+        return pod_name in names
+
+    def _wait_for_pod_deleted(self, pod_name, timeout=120, interval=5):
+        """Wait until a pod is fully gone or timeout expires."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if not self._pod_exists(pod_name):
+                return True
+            time.sleep(interval)
+        return False
+
+    def _delete_pod_with_retry(self, pod_name, max_retries=3):
+        """Delete a pod with retry logic."""
+        for attempt in range(max_retries):
+            try:
+                self.backend.delete_resource("pod", pod_name)
+                return
+            except Exception:
+                if attempt == max_retries - 1:
+                    raise
+                time.sleep(5)
+
     def test_04_pod_lifecycle(self):
         """Test pod lifecycle with a simple deployment."""
         import uuid
-        pod_name = f"vmharness-test-pod-{uuid.uuid4().hex[:8]}"
+        from datetime import datetime
+        pod_name = f"vmharness-test-pod-{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
         manifest = {
             "apiVersion": "v1",
             "kind": "Pod",
@@ -170,6 +197,11 @@ class KubernetesIntegrationTest(unittest.TestCase):
         }
 
         try:
+            # Clean up any leftover pod with the same name
+            if self._pod_exists(pod_name):
+                self._delete_pod_with_retry(pod_name)
+                self._wait_for_pod_deleted(pod_name)
+
             self.backend.apply_manifest(manifest)
             time.sleep(5)
 
@@ -177,8 +209,11 @@ class KubernetesIntegrationTest(unittest.TestCase):
             names = [p.get("name", "") if isinstance(p, dict) else getattr(p, "name", "") for p in pods]
             self.assertIn(pod_name, names)
 
-            self.backend.delete_resource("pod", pod_name)
-            time.sleep(30)
+            self._delete_pod_with_retry(pod_name)
+            self.assertTrue(
+                self._wait_for_pod_deleted(pod_name),
+                f"Pod {pod_name} was not deleted within timeout",
+            )
 
             pods = self.backend.list_pods()
             names = [p.get("name", "") if isinstance(p, dict) else getattr(p, "name", "") for p in pods]

@@ -11,6 +11,8 @@ Features:
 
 from __future__ import annotations
 
+from typing import Any
+
 import io
 import time
 from pathlib import Path
@@ -307,7 +309,7 @@ class PairingPanel(QWidget):
         # Auto-refresh every 10s
         self._pairing_timer.start(10000)
 
-    def set_server(self, server):
+    def set_server(self, server: Any) -> None:
         """Set the API server reference for token generation."""
         self._server = server
         self._generate_pairing()

@@ -7,6 +7,8 @@ filesystem.
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor
@@ -372,7 +374,7 @@ class GuestTerminalPanel(QWidget):
             # Simulate upload
             QTimer.singleShot(1000, lambda: self.terminal.append_line(f"Upload complete: {path} → /home/omarchyvm/", "OUTPUT"))
 
-    def set_ssh_bridge(self, bridge):
+    def set_ssh_bridge(self, bridge: Any) -> None:
         """Connect to SSH bridge for real commands and file operations."""
         self._ssh_bridge = bridge
         bridge.command_output.connect(self._on_command_output)

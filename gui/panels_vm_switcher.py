@@ -267,7 +267,7 @@ class VMSwitcherPanel(QWidget):
 
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh the VM list and details."""
         # Poll status
         self._manager.poll_status()
@@ -451,7 +451,7 @@ class VMSwitcherPanel(QWidget):
         """Get the currently active VM name."""
         return self._active_vm
 
-    def set_active_vm(self, name: str):
+    def set_active_vm(self, name: str) -> None:
         """Set the active VM from external (e.g., dashboard selection)."""
         self._active_vm = name
         self._active_label.setText(name)

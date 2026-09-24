@@ -59,7 +59,7 @@ class AsyncAdapter:
         return future.result(timeout=timeout)
 
     @property
-    def docker(self):
+    def docker(self) -> "_DockerAdapter":
         """Get Docker adapter."""
         if self._docker is None:
             from vm_harness.container.docker.backend import DockerBackend
@@ -68,7 +68,7 @@ class AsyncAdapter:
         return _DockerAdapter(self._docker, self._run_async)
 
     @property
-    def kubernetes(self):
+    def kubernetes(self) -> "_KubernetesAdapter":
         """Get Kubernetes adapter."""
         if self._kubernetes is None:
             from vm_harness.container.kubernetes.backend import KubernetesBackend
@@ -77,7 +77,7 @@ class AsyncAdapter:
         return _KubernetesAdapter(self._kubernetes, self._run_async)
 
     @property
-    def podman(self):
+    def podman(self) -> "_PodmanAdapter":
         """Get Podman adapter."""
         if self._podman is None:
             from vm_harness.container.podman.backend import PodmanBackend
@@ -86,7 +86,7 @@ class AsyncAdapter:
         return _PodmanAdapter(self._podman, self._run_async)
 
     @property
-    def qemu(self):
+    def qemu(self) -> "_QEMUAdapter":
         """Get QEMU adapter."""
         if self._qemu is None:
             from vm_harness.hypervisor.qemu.backend import QEMUBackend
@@ -95,7 +95,7 @@ class AsyncAdapter:
         return _QEMUAdapter(self._qemu, self._run_async)
 
     @property
-    def vmware(self):
+    def vmware(self) -> "_VMwareAdapter":
         """Get VMware adapter."""
         if self._vmware is None:
             from vm_harness.hypervisor.vmware.backend import VMwareBackend
@@ -104,7 +104,7 @@ class AsyncAdapter:
         return _VMwareAdapter(self._vmware, self._run_async)
 
     @property
-    def vbox(self):
+    def vbox(self) -> "_VirtualBoxAdapter":
         """Get VirtualBox adapter."""
         if self._vbox is None:
             from vm_harness.hypervisor.virtualbox.backend import VirtualBoxBackend
@@ -275,7 +275,7 @@ class _PodmanAdapter:
     def list_containers(self) -> list:
         return self._run(self._backend.list_containers())
 
-    def create_container(self, config=None, **kwargs) -> Any:
+    def create_container(self, config: Any = None, **kwargs: Any) -> Any:
         from vm_harness.container.backend import ContainerConfig
         if config is None:
             config = ContainerConfig(**kwargs)
@@ -315,7 +315,7 @@ class _QEMUAdapter:
                 result.append(vm)
         return result
 
-    def create_vm(self, config) -> str:
+    def create_vm(self, config: Any) -> str:
         from vm_harness.hypervisor.backend import VMConfig
         if isinstance(config, dict):
             config = VMConfig(

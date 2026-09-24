@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 from pathlib import Path
 
@@ -58,11 +60,11 @@ class GuestAgentPanel(QWidget):
         tabs.addTab(self._network_tab(), "Network")
         layout.addWidget(tabs)
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         """Connect to QMP bridge."""
         self._qmp_bridge = bridge
 
-    def set_ssh_bridge(self, bridge):
+    def set_ssh_bridge(self, bridge: Any) -> None:
         """Connect to SSH bridge for real guest data."""
         self._ssh_bridge = bridge
         if bridge:

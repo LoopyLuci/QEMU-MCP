@@ -42,11 +42,11 @@ class _PullWorker(QThread):
         self._image_name = image_name
         self._cancelled = False
 
-    def cancel(self):
+    def cancel(self) -> None:
         """Request cancellation (checked between stream chunks)."""
         self._cancelled = True
 
-    def run(self):
+    def run(self) -> None:
         """Execute docker.images.pull() with streaming and emit progress."""
         try:
             from docker import DockerClient
@@ -171,14 +171,14 @@ class ImagePullDialog(QProgressDialog):
 
         self.canceled.connect(self._on_cancel)
 
-    def start_pull(self):
+    def start_pull(self) -> None:
         """Start the background pull thread."""
         self._worker = _PullWorker(self._image_name, self)
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.start()
 
-    def exec_(self):  # noqa: N802 — Qt naming convention
+    def exec_(self) -> int:  # noqa: N802 — Qt naming convention
         """Start the pull and show the dialog modally."""
         self.start_pull()
         return super().exec_()

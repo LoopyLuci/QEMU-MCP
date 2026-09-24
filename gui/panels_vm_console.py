@@ -7,6 +7,8 @@ manual refresh controls.
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 import threading
 import time
@@ -481,7 +483,7 @@ class VMConsolePanel(QWidget):
                 )
                 self._disconnect()
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: Any) -> None:
         """Clean up WebSocket on panel close."""
         self._disconnect()
         super().closeEvent(event)

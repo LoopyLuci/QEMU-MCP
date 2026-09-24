@@ -157,7 +157,7 @@ class PodmanBackend(ContainerBackend):
         self._run_podman(args)
 
     async def exec_command(
-        self, container_id: str, command, tty: bool = False, timeout: int | None = None
+        self, container_id: str, command: Union[str, List[str]], tty: bool = False, timeout: int | None = None
     ) -> CommandResult:
         """Execute a command in a container."""
         args = ["exec"]
@@ -170,7 +170,7 @@ class PodmanBackend(ContainerBackend):
         output = self._run_podman(args, timeout=timeout or 30)
         return CommandResult(exit_code=0, output=output, stderr="")
 
-    async def get_logs(self, container_id: str, tail: int = 100, **kwargs):
+    async def get_logs(self, container_id: str, tail: int = 100, **kwargs: Any) -> str:
         """Get container logs."""
         output = self._run_podman(["logs", "--tail", str(tail), container_id])
         return output

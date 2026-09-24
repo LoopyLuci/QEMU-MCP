@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QTextCursor
@@ -144,7 +146,7 @@ class QMPConsolePanel(QWidget):
 
         layout.addWidget(input_row)
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         """Connect to QMP bridge."""
         self._qmp_bridge = bridge
         if bridge:

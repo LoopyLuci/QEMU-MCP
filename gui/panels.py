@@ -6,6 +6,8 @@ quick action buttons, and recent activity log.
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor
@@ -159,7 +161,7 @@ class DashboardPanel(QWidget):
 
         layout.addStretch()
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         """Connect to the QMP bridge."""
         self._qmp_bridge = bridge
         if bridge:
@@ -259,7 +261,7 @@ class DashboardPanel(QWidget):
             self._qmp_bridge.system_reset()
             self.add_activity("VM reset requested")
 
-    def add_activity(self, message: str):
+    def add_activity(self, message: str) -> None:
         """Add an activity log entry."""
         from datetime import datetime
         ts = datetime.now().strftime("%H:%M:%S")

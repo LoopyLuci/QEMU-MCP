@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -46,7 +48,7 @@ class AdvancedQEmuPanel(QWidget):
         tabs.addTab(self._qmp_log_tab(), "QMP Log")
         layout.addWidget(tabs)
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         self._qmp_bridge = bridge
 
     def _machine_tab(self) -> QWidget:

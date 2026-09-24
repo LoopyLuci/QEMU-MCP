@@ -6,6 +6,8 @@ color-coded status indicators, and a context menu (delete / write-yaml).
 
 from __future__ import annotations
 
+from typing import Any
+
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtWidgets import (
@@ -66,14 +68,14 @@ class KubernetesTreePanel(QWidget):
 
     # ── Visibility-based timer control ───────────────────────────────────────
 
-    def showEvent(self, event):
+    def showEvent(self, event: Any) -> None:
         """Start polling when the panel becomes visible."""
         super().showEvent(event)
         if not self._refresh_timer.isActive():
             self._refresh_timer.start()
             self._refresh()
 
-    def hideEvent(self, event):
+    def hideEvent(self, event: Any) -> None:
         """Stop polling when the panel is hidden."""
         super().hideEvent(event)
         self._refresh_timer.stop()

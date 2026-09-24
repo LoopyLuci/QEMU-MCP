@@ -174,7 +174,7 @@ class CredentialDialog(QDialog):
 
         self.save_btn.clicked.connect(self._save)
 
-    def load_credential(self, cred_id: str):
+    def load_credential(self, cred_id: str) -> None:
         """Load credential data into the form."""
         store = CredentialStore()
         entry = store.get(cred_id)

@@ -95,7 +95,7 @@ class SnapshotPanel(QWidget):
         bl.addStretch()
         layout.addWidget(btn_row)
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Load snapshot list from qcow2 image."""
         self._list.clear()
         try:

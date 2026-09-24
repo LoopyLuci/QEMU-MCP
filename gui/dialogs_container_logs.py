@@ -11,6 +11,8 @@ Usage:
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 import ssl
 import urllib.request
@@ -222,12 +224,12 @@ class ContainerLogsDialog(QDialog):
 
     # ── Override ───────────────────────────────────────────────────────────
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: Any) -> None:
         """Stop the auto-refresh timer when the dialog closes."""
         self._refresh_timer.stop()
         super().closeEvent(event)
 
-    def reject(self):
+    def reject(self) -> None:
         """Stop timer on Esc / Cancel."""
         self._refresh_timer.stop()
         super().reject()

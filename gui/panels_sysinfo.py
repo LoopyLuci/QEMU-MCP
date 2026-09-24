@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import asyncio
 import json
 import logging
@@ -31,7 +33,7 @@ class QMPDataCollector(QThread):
         self._host = host
         self._port = port
     
-    def run(self):
+    def run(self) -> None:
         """Collect data from QMP."""
         try:
             import sys
@@ -99,10 +101,10 @@ class QemuSystemInfoPanel(QWidget):
         self._timer.timeout.connect(self.refresh)
         self._timer.start(5000)
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         self._qmp_bridge = bridge
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh QMP data."""
         if self._qmp_bridge and self._qmp_bridge.is_connected:
             self._conn_status.setText("Connected")

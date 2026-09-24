@@ -242,7 +242,7 @@ class VMControlPanel(QWidget):
         self._pulse_timer.timeout.connect(self._pulse_connection)
         self._pulse_timer.start(5000)
 
-    def set_multi_qmp_bridge(self, bridge: MultiVMQMPBridge):
+    def set_multi_qmp_bridge(self, bridge: MultiVMQMPBridge) -> None:
         """Set the multi-VM QMP bridge."""
         self._multi_qmp = bridge
         bridge.connected.connect(self._on_bridge_connected)
@@ -250,11 +250,11 @@ class VMControlPanel(QWidget):
         bridge.active_vm_changed.connect(self._on_active_vm_changed)
         bridge.command_result.connect(self._on_command_result)
 
-    def set_manager(self, manager: MultiVMManager):
+    def set_manager(self, manager: MultiVMManager) -> None:
         """Set the MultiVMManager for config access."""
         self._manager = manager
 
-    def switch_to_vm(self, vm_name: str):
+    def switch_to_vm(self, vm_name: str) -> None:
         """Switch the control panel context to a specific VM."""
         self._active_vm = vm_name
 

@@ -6,6 +6,8 @@ Uses the Docker stats API via the AsyncAdapter.
 
 from __future__ import annotations
 
+from typing import Any
+
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPen
 from PyQt5.QtWidgets import (
@@ -29,14 +31,14 @@ class SparklineWidget(QWidget):
         self.setMinimumHeight(40)
         self.setMaximumHeight(60)
 
-    def add_value(self, value: float):
+    def add_value(self, value: float) -> None:
         """Add a new data point."""
         self._data.append(value)
         if len(self._data) > self._max_points:
             self._data.pop(0)
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event: Any) -> None:
         """Draw sparkline."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)

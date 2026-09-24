@@ -11,6 +11,8 @@ Features:
 
 from __future__ import annotations
 
+from typing import Any
+
 import re
 from typing import Optional
 
@@ -71,28 +73,28 @@ class TopologyDiagram(QWidget):
         self._bandwidth_out = 0
         self._port_forwards: list[dict] = []
 
-    def set_mode(self, mode: str):
+    def set_mode(self, mode: str) -> None:
         self._mode = mode
         self.update()
 
-    def set_adapter(self, adapter: str):
+    def set_adapter(self, adapter: str) -> None:
         self._adapter = adapter
         self.update()
 
-    def set_mac(self, mac: str):
+    def set_mac(self, mac: str) -> None:
         self._mac = mac
         self.update()
 
-    def set_bandwidth(self, inbound: int, outbound: int):
+    def set_bandwidth(self, inbound: int, outbound: int) -> None:
         self._bandwidth_in = inbound
         self._bandwidth_out = outbound
         self.update()
 
-    def set_port_forwards(self, forwards: list[dict]):
+    def set_port_forwards(self, forwards: list[dict]) -> None:
         self._port_forwards = forwards
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event: Any) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
@@ -762,7 +764,7 @@ class NetworkConfigEditor(QWidget):
             }
         return {}
 
-    def set_config(self, config: dict):
+    def set_config(self, config: dict) -> None:
         """Set the panel state from a config dict."""
         if "mode" in config:
             idx = self._mode_combo.findText(config["mode"])

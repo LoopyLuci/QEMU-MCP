@@ -109,7 +109,7 @@ class StoragePanel(QWidget):
 
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh disk list."""
         self._disk_list.clear()
         vm_dir = Path.home() / "Virtual Machines"

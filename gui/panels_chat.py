@@ -138,7 +138,7 @@ class ExpandableToolWidget(QFrame):
         self._toggle_btn.setText("▼" if self._expanded else "▶")
         self._detail_widget.setVisible(self._expanded)
 
-    def set_result(self, result: str, success: bool = True):
+    def set_result(self, result: str, success: bool = True) -> None:
         """Update the widget with the tool result."""
         self._result_text = result
         self._status_label.setText("✅ done" if success else "❌ failed")
@@ -262,12 +262,12 @@ class ChatPanel(QWidget):
         self._append_message("system", "Welcome to Agentic Chat! I can help you control your VM, execute commands, manage snapshots, and more.")
         self._append_message("system", "Select a provider above and start chatting. If you haven't configured an API key, go to Settings > AI Providers.")
 
-    def set_qmp_bridge(self, bridge: QMPBridge):
+    def set_qmp_bridge(self, bridge: QMPBridge) -> None:
         """Attach a QMP bridge for VM operations."""
         self._qmp_bridge = bridge
         self._executor.set_qmp_bridge(bridge)
 
-    def set_ssh_bridge(self, bridge: SSHBridge):
+    def set_ssh_bridge(self, bridge: SSHBridge) -> None:
         """Attach an SSH bridge for guest operations."""
         self._ssh_bridge = bridge
         self._executor.set_ssh_bridge(bridge)

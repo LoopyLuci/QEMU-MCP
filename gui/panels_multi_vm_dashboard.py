@@ -9,6 +9,8 @@ Displays:
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor
@@ -159,7 +161,7 @@ class VMCard(QFrame):
         br_layout.addStretch()
         layout.addWidget(btn_row)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: Any) -> None:
         self.clicked.emit(f"select:{self._name}")
         super().mousePressEvent(event)
 
@@ -323,7 +325,7 @@ class MultiVMDashboardPanel(QWidget):
 
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh all VM cards and resource display."""
         # Poll status first
         self._manager.poll_status()
@@ -408,7 +410,7 @@ class MultiVMDashboardPanel(QWidget):
         """Add a new VM via the switcher panel."""
         self.vm_action.emit("add", "")
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         """Connect to QMP bridge for control operations."""
         self._qmp_bridge = bridge
 
@@ -416,7 +418,7 @@ class MultiVMDashboardPanel(QWidget):
         """Access the underlying MultiVMManager."""
         return self._manager
 
-    def set_active_vm(self, name: str):
+    def set_active_vm(self, name: str) -> None:
         """Set the active VM for context display."""
         self._active_vm = name
         config = self._manager.get_vm(name)

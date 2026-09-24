@@ -8,6 +8,8 @@ and Alerts Log tab (fired/resolved alert history).
 
 from __future__ import annotations
 
+from typing import Any
+
 from gui.theme import T
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
@@ -54,7 +56,7 @@ class HistoryTab(QWidget):
         self._time_range = "24h"
         self._build_ui()
 
-    def set_metrics_store(self, store: MetricsStore):
+    def set_metrics_store(self, store: MetricsStore) -> None:
         self._metrics_store = store
         self._refresh_btn.setEnabled(True)
         self._refresh()
@@ -685,11 +687,11 @@ class TelemetryPanel(QWidget):
             self.host_ram.update_data(random.uniform(35, 50))
             self.host_disk.update_data(random.uniform(10, 15))
 
-    def set_qmp_bridge(self, bridge):
+    def set_qmp_bridge(self, bridge: Any) -> None:
         """Connect to QMP bridge for VM metrics."""
         self._qmp_bridge = bridge
 
-    def set_ssh_bridge(self, bridge):
+    def set_ssh_bridge(self, bridge: Any) -> None:
         """Connect to SSH bridge for guest metrics."""
         self._ssh_bridge = bridge
 
@@ -797,7 +799,7 @@ class TelemetryPanel(QWidget):
         ]:
             chart.clear()
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: Any) -> None:
         """Clean up resources on close."""
         if self._metrics_store and HAS_METRICS_STORE:
             self._metrics_store.close()

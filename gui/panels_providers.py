@@ -84,7 +84,7 @@ class AIProvidersPanel(QWidget):
 
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
         """Refresh the provider table."""
         providers = self._store.get_all_providers()
         self._table.setRowCount(len(providers))
