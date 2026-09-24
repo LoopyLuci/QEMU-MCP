@@ -61,6 +61,7 @@ from gui.widgets import (
 )
 from gui.theme import T
 from gui.credential_store import CredentialStore
+from gui.plugin_manager import PluginManager
 
 
 # ── Title Bar ───────────────────────────────────────────────────────────────────
@@ -266,6 +267,51 @@ class Sidebar(QWidget):
                 btn.setChecked(panel_name == name)
         self.current_panel_changed.emit(name)
 
+    def add_panel_button(self, label: str, icon: str, name: str):
+        """Dynamically add a sidebar button for a plugin panel."""
+        self.PANELS.append((label, icon, name))
+
+        # Find the layout — it's the first QVBoxLayout child
+        layout = self.layout()
+        if layout is None:
+            return
+
+        # Insert before the stretch and version label
+        insert_index = layout.count() - 1  # before the version label
+        if insert_index < 0:
+            insert_index = layout.count()
+
+        btn = QPushButton(f"{icon}  {label}")
+        btn.setObjectName(f"sidebar_{name}")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setCheckable(True)
+        btn.setMinimumHeight(36)
+        btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: #94a3b8;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                padding: 0 8px;
+            }}
+            QPushButton:hover {{
+                background: #1e293b;
+                color: #e2e8f0;
+            }}
+            QPushButton:checked {{
+                background: #1e3a5f;
+                color: #60a5fa;
+            }}
+            #{btn.objectName()}:hover {{
+                background: #1e293b;
+                color: #e2e8f0;
+            }}
+        """)
+        btn.clicked.connect(lambda checked, n=name: self._select_panel(n))
+        layout.insertWidget(insert_index, btn)
+
 
 # ── Main Window ─────────────────────────────────────────────────────────────────
 
@@ -377,6 +423,9 @@ class MainWindow(QMainWindow):
         self.ssh_bridge.file_list.connect(self._on_ssh_file_list)
         self.ssh_bridge.error.connect(self._on_ssh_error)
         self.ssh_bridge.connected_to.connect(self._on_ssh_connected_to)
+
+        # ── Plugin Manager ────────────────────────────────────────────────────
+        self.plugin_manager = PluginManager()
 
         # ── Build panels ───────────────────────────────────────────────────────
         self._build_panels()
@@ -509,6 +558,9 @@ class MainWindow(QMainWindow):
         """Clean up on close — minimize to tray with NO taskbar icon."""
         # Save window state for next launch
         self._save_state()
+        # Unload plugins
+        if hasattr(self, 'plugin_manager'):
+            self.plugin_manager.unload_all()
         # Release resize grips
         if hasattr(self, '_grips'):
             for grip in self._grips:
@@ -637,12 +689,60 @@ class MainWindow(QMainWindow):
         if "qmp_console" in self.panels:
             self.panels["qmp_console"].set_qmp_bridge(self.qmp_bridge)
 
+        # ── Load plugin panels ───────────────────────────────────────────────
+        self._load_plugin_panels()
+
         self._switch_panel("dashboard")
 
     def _switch_panel(self, name: str):
         if name in self.panels:
             self.panel_stack.setCurrentWidget(self.panels[name])
             self.status_label.setText(f"Panel: {name.replace('_', ' ').title()}")
+
+    def _load_plugin_panels(self):
+        """Discover and load plugin panels from the plugin manager."""
+        from gui.plugin import PanelPlugin
+
+        # Discover available plugins
+        discovered = self.plugin_manager.discover_plugins()
+        if not discovered:
+            return
+
+        # Load all discovered plugins
+        self.plugin_manager.load_all()
+
+        # Create panels for each PanelPlugin
+        for plugin in self.plugin_manager.get_panels():
+            meta = plugin.metadata
+            panel_name = meta.name
+
+            # Skip if a panel with this name already exists
+            if panel_name in self.panels:
+                continue
+
+            try:
+                panel_widget = plugin.create_panel(self)
+                self.panels[panel_name] = panel_widget
+                self.panel_stack.addWidget(panel_widget)
+
+                # Add to sidebar
+                label = meta.description or panel_name.replace("_", " ").title()
+                icon = "🔌"
+                self.sidebar.add_panel_button(label, icon, panel_name)
+
+                # Wire bridges if the panel supports them
+                if hasattr(panel_widget, "set_qmp_bridge"):
+                    panel_widget.set_qmp_bridge(self.qmp_bridge)
+                if hasattr(panel_widget, "set_ssh_bridge"):
+                    panel_widget.set_ssh_bridge(self.ssh_bridge)
+                if hasattr(panel_widget, "set_multi_qmp_bridge"):
+                    panel_widget.set_multi_qmp_bridge(self.qmp_bridge)
+
+            except Exception as e:
+                import logging
+                logging.getLogger("vmharness.gui").warning(
+                    f"Failed to create panel for plugin '{panel_name}': {e}"
+                )
 
     def _apply_dpi_scaling(self):
         """Apply DPI-aware scaling to all child widgets."""
