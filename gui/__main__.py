@@ -114,22 +114,36 @@ def _release_lock():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _stop_event = threading.Event()
+_headless_loop: asyncio.AbstractEventLoop | None = None
+_bridge_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _run_headless_server():
-    """Run headless server — headless_main is sync and manages its own event loop."""
+    """Run headless server in its own event loop."""
+    global _headless_loop
+    loop = asyncio.new_event_loop()
+    _headless_loop = loop
+    asyncio.set_event_loop(loop)
     try:
-        from headless_server import main as headless_main
-        headless_main()
+        async def _run():
+            from headless_server import main as headless_main
+            # headless_main is sync; run in executor to keep loop responsive
+            await loop.run_in_executor(None, headless_main)
+        loop.run_until_complete(_run())
     except (SystemExit, KeyboardInterrupt):
         pass
     except Exception as e:
         logger.error("Headless server error: %s", e)
+    finally:
+        _headless_loop = None
+        loop.close()
 
 
 def _run_streaming_bridge():
     """Run streaming bridge with graceful shutdown support."""
+    global _bridge_loop
     loop = asyncio.new_event_loop()
+    _bridge_loop = loop
     asyncio.set_event_loop(loop)
     try:
         async def _run():
@@ -141,7 +155,17 @@ def _run_streaming_bridge():
     except Exception as e:
         logger.error("Streaming bridge error: %s", e)
     finally:
+        _bridge_loop = None
         loop.close()
+
+
+def _stop_background_threads():
+    """Signal threads to stop and gracefully shut down their event loops."""
+    _stop_event.set()
+    # Stop event loops from the main thread (thread-safe)
+    for loop in (_headless_loop, _bridge_loop):
+        if loop is not None and loop.is_running():
+            loop.call_soon_threadsafe(loop.stop)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -294,12 +318,13 @@ def main():
             _release_lock()
             sys.exit(1)
 
-    # Signal background threads to stop (daemon threads will be killed on exit)
-    _stop_event.set()
+    # Stop background threads gracefully before exit
+    _stop_background_threads()
+    if headless_thread is not None:
+        headless_thread.join(timeout=3)
+    if bridge_thread is not None:
+        bridge_thread.join(timeout=3)
     _release_lock()
-    # Force exit without waiting for daemon threads to finish
-    # sys.exit() hangs during PyInstaller cleanup with daemon threads
-    import os
     os._exit(exit_code)
 
 

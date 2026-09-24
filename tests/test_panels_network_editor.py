@@ -244,8 +244,8 @@ class TestMacConfiguration:
         editor._generate_mac()
         new_mac = editor._mac_input.text()
         assert validate_mac(new_mac)
-        # Very unlikely to be the same
-        assert new_mac != old_mac or True  # Allow same by chance
+        # Very unlikely to be the same (MAC generation uses random bytes)
+        assert new_mac != old_mac
 
     def test_mac_updates_diagram(self, editor):
         """Changing MAC should update diagram."""
@@ -381,7 +381,7 @@ class TestTopologyDiagram:
         # Force a repaint
         diagram.update()
         # If we get here without exception, paint works
-        assert True
+        assert diagram._scene is not None
 
 
 # ── Test Category 8: Port Forward Dialog ────────────────────────────────────

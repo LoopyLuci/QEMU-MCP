@@ -104,6 +104,10 @@ class TestImagePullDialog(unittest.TestCase):
             timeout_timer.start()
             loop.exec_()
 
+            # Wait for the thread to fully finish
+            if dlg._worker and dlg._worker.isRunning():
+                dlg._worker.wait(5000)
+
             # Verify the worker finished
             self.assertFalse(dlg._worker.isRunning())
 
