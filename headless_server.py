@@ -26,7 +26,7 @@ from aiohttp import web
 
 from gui.multi_vm import MultiVMManager, DEFAULT_QEMU_BINARY
 from gui.multi_vm_qmp_bridge import MultiVMQMPBridge
-from src.vm_mcp.api_server import QMCMApiServer, get_tailscale_info, log
+from src.vm_harness.api_server import QMCMApiServer, get_tailscale_info, log
 
 
 def ensure_tls_certs(cert_path: Path = CERT_FILE, key_path: Path = KEY_FILE) -> tuple[Path, Path]:

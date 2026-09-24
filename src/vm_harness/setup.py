@@ -178,16 +178,12 @@ class QMPClient:
 
     async def _read_response(self) -> dict[str, Any]:
         """Read one JSON response from QMP."""
-        data = b""
-        while not data.endswith(b"\n"):
-            chunk = await asyncio.wait_for(
-                self._reader.read(1),
-                timeout=self._timeout,
-            )
-            if not chunk:
-                raise RuntimeError("QMP connection closed")
-            data += chunk
-
+        data = await asyncio.wait_for(
+            self._reader.readuntil(b"\n"),
+            timeout=self._timeout,
+        )
+        if not data:
+            raise RuntimeError("QMP connection closed")
         response = json.loads(data.decode())
         if "error" in response:
             raise RuntimeError(f"QMP error: {response['error'].get('desc', 'unknown error')}")

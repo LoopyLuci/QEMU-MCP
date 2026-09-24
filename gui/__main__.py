@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import asyncio
 import logging
 import os
 import signal
@@ -116,29 +117,31 @@ _stop_event = threading.Event()
 
 
 def _run_headless_server():
-    """Run headless server in a daemon thread with auto-restart."""
-    import asyncio
-    while not _stop_event.is_set():
-        try:
-            from headless_server import main as headless_main
-            logger.info("Starting headless server thread")
-            asyncio.run(headless_main())
-        except Exception as e:
-            logger.error("Headless server error: %s — restarting in 5s", e)
-            _stop_event.wait(5)
+    """Run headless server — headless_main is sync and manages its own event loop."""
+    try:
+        from headless_server import main as headless_main
+        headless_main()
+    except (SystemExit, KeyboardInterrupt):
+        pass
+    except Exception as e:
+        logger.error("Headless server error: %s", e)
 
 
 def _run_streaming_bridge():
-    """Run streaming bridge in a daemon thread with auto-restart."""
-    import asyncio
-    while not _stop_event.is_set():
-        try:
+    """Run streaming bridge with graceful shutdown support."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        async def _run():
             from streaming_bridge import main as bridge_main
-            logger.info("Starting streaming bridge thread")
-            asyncio.run(bridge_main())
-        except Exception as e:
-            logger.error("Streaming bridge error: %s — restarting in 5s", e)
-            _stop_event.wait(5)
+            await bridge_main()
+        loop.run_until_complete(_run())
+    except (SystemExit, KeyboardInterrupt):
+        pass
+    except Exception as e:
+        logger.error("Streaming bridge error: %s", e)
+    finally:
+        loop.close()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -268,7 +271,9 @@ def main():
     # Register atexit cleanup
     atexit.register(_release_lock)
 
-    # Start service threads (daemon threads with auto-restart)
+    # Start service threads (daemon — will be killed on exit)
+    headless_thread = None
+    bridge_thread = None
     if not args.headless:
         headless_thread = threading.Thread(target=_run_headless_server, daemon=True)
         headless_thread.start()
@@ -289,8 +294,13 @@ def main():
             _release_lock()
             sys.exit(1)
 
+    # Signal background threads to stop (daemon threads will be killed on exit)
+    _stop_event.set()
     _release_lock()
-    sys.exit(exit_code)
+    # Force exit without waiting for daemon threads to finish
+    # sys.exit() hangs during PyInstaller cleanup with daemon threads
+    import os
+    os._exit(exit_code)
 
 
 def _run_headless(args: argparse.Namespace) -> int:
