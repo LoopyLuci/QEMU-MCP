@@ -1,0 +1,82 @@
+{
+  "vm_0": {
+    "name": "vm_0",
+    "status": "stopped",
+    "pid": 0,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.357217",
+    "checksum": "e38b6ae312a8b230"
+  },
+  "vm_1": {
+    "name": "vm_1",
+    "status": "stopped",
+    "pid": 1,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.315207",
+    "checksum": "07224238a92a4abd"
+  },
+  "vm_2": {
+    "name": "vm_2",
+    "status": "stopped",
+    "pid": 2,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.269040",
+    "checksum": "abda02c26b7a1475"
+  },
+  "vm_3": {
+    "name": "vm_3",
+    "status": "stopped",
+    "pid": 3,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.594841",
+    "checksum": "55095659639a82c2"
+  },
+  "vm_4": {
+    "name": "vm_4",
+    "status": "stopped",
+    "pid": 4,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.574838",
+    "checksum": "138ac1e5fb9ae797"
+  },
+  "vm_5": {
+    "name": "vm_5",
+    "status": "stopped",
+    "pid": 5,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.334219",
+    "checksum": "3750d1a357571c41"
+  },
+  "vm_6": {
+    "name": "vm_6",
+    "status": "stopped",
+    "pid": 6,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.588847",
+    "checksum": "0ff2b1f1d0c4235b"
+  },
+  "vm_7": {
+    "name": "vm_7",
+    "status": "stopped",
+    "pid": 7,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.600839",
+    "checksum": "76252a5e05b6d1b3"
+  },
+  "vm_8": {
+    "name": "vm_8",
+    "status": "stopped",
+    "pid": 8,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.560842",
+    "checksum": "12c53a00bfa0dccc"
+  },
+  "vm_9": {
+    "name": "vm_9",
+    "status": "stopped",
+    "pid": 9,
+    "config": {},
+    "last_updated": "2026-09-24T19:44:51.500224",
+    "checksum": "19301ae7e6b166db"
+  }
+}
