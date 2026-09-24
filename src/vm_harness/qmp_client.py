@@ -69,10 +69,31 @@ class QMPClient:
 
         self._connected = True
 
-        # QMP handshake: enable command processing
+        # QMP handshake: read greeting, then enable command processing
+        await self._read_greeting()
         await self.send("qmp_capabilities")
 
         logger.info("QMP connected: %s", self.uri)
+
+    async def _read_greeting(self) -> dict[str, Any]:
+        """Read the QMP greeting message sent by QEMU on connect.
+
+        QEMU sends a JSON greeting like:
+            {"QMP": {"version": {...}, "capabilities": [...]}}
+        before accepting any commands.  This must be consumed first.
+        """
+        assert self._reader is not None
+        data = await asyncio.wait_for(
+            self._reader.readuntil(b"\n"),
+            timeout=self._timeout,
+        )
+        if not data:
+            raise RuntimeError("QMP connection closed while reading greeting")
+        greeting = json.loads(data.decode())
+        if "QMP" not in greeting:
+            raise RuntimeError(f"Invalid QMP greeting: {greeting}")
+        logger.debug("QMP greeting received")
+        return greeting
 
     async def send(self, cmd: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
         """Send a QMP command and return the parsed response.

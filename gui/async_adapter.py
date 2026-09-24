@@ -402,14 +402,24 @@ class _VirtualBoxAdapter:
     def start_vm(self, vm_name: str) -> None:
         return self._run(self._backend.start_vm(vm_name))
 
-    def stop_vm(self, vm_name: str) -> None:
-        return self._run(self._backend.stop_vm(vm_name))
+    def stop_vm(self, vm_name: str, force: bool = False) -> None:
+        return self._run(self._backend.stop_vm(vm_name, force=force))
 
     def pause_vm(self, vm_name: str) -> None:
         return self._run(self._backend.pause_vm(vm_name))
 
     def reset_vm(self, vm_name: str) -> None:
         return self._run(self._backend.reset_vm(name=vm_name))
+
+    def get_status(self, vm_name: str) -> str:
+        status = self._run(self._backend.get_status(vm_name))
+        if hasattr(status, 'state') and hasattr(status.state, 'value'):
+            return status.state.value
+        if hasattr(status, 'value'):
+            return status.value
+        if isinstance(status, str):
+            return status
+        return str(status)
 
 
 # Global singleton

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import asyncssh
 
-from vm_mcp.config import Secrets, VmMCPSettings
+from vm_harness.config import Secrets, VmMCPSettings
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +87,10 @@ async def run_guest_command(
         dict with keys: exit_code, stdout, stderr, success
     """
     if secrets is None:
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
         secrets = Secrets()
     if settings is None:
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
         settings = VmMCPSettings()
 
     conn = await _connect(secrets, settings)
@@ -128,10 +128,10 @@ async def read_guest_file(
     Returns (content, encoding).
     """
     if secrets is None:
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
         secrets = Secrets()
     if settings is None:
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
         settings = VmMCPSettings()
 
     conn = await _connect(secrets, settings)
@@ -157,10 +157,10 @@ async def write_guest_file(
     Creates parent directories if needed.  Returns bytes written.
     """
     if secrets is None:
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
         secrets = Secrets()
     if settings is None:
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
         settings = VmMCPSettings()
 
     conn = await _connect(secrets, settings)
@@ -193,10 +193,10 @@ async def list_guest_directory(
     Returns a list of dicts: {name, type, size, mtime}.
     """
     if secrets is None:
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
         secrets = Secrets()
     if settings is None:
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
         settings = VmMCPSettings()
 
     conn = await _connect(secrets, settings)
@@ -228,10 +228,10 @@ async def remove_guest_path(
     Returns info dict about the removed path, or raises on error.
     """
     if secrets is None:
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
         secrets = Secrets()
     if settings is None:
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
         settings = VmMCPSettings()
 
     conn = await _connect(secrets, settings)

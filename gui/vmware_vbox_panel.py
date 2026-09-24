@@ -206,17 +206,17 @@ class VMwareVBoxPanel(QWidget):
         try:
             adapter = get_adapter()
             adapter.vmware.list_vms()
-            self._vmware_status.set_color(QColor("#22c55e"))
+            self._vmware_status.set_status(True, True)
         except Exception:
-            self._vmware_status.set_color(QColor("#ef4444"))
+            self._vmware_status.set_status(False, False)
 
         try:
             from gui.async_adapter import get_adapter
             adapter = get_adapter()
             adapter.vbox.list_vms()
-            self._vbox_status.set_color(QColor("#22c55e"))
+            self._vbox_status.set_status(True, True)
         except Exception:
-            self._vbox_status.set_color(QColor("#ef4444"))
+            self._vbox_status.set_status(False, False)
 
     def _load_vmware(self):
         self._vmware_table.setRowCount(0)

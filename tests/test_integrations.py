@@ -327,8 +327,8 @@ class QEMUIntegrationTest(unittest.TestCase):
         except Exception as e:
             self.skipTest(f"QEMU lifecycle test skipped: {e}")
         try:
-            # Start
-            self.backend.start_vm(vm_name)
+            # Start (headless to avoid SPICE display hang on headless machines)
+            self.backend.start_vm(vm_name, headless=True)
             time.sleep(3)
             status = self.backend.get_status(vm_name)
             self.assertEqual(status, "running")
@@ -411,11 +411,25 @@ class VirtualBoxIntegrationTest(unittest.TestCase):
         if not vms:
             self.skipTest("No VirtualBox VMs available")
         vm = vms[0]
+        vm_name = vm["name"] if isinstance(vm, dict) else vm
         try:
-            self.backend.stop_vm(vm["name"])
+            # Stop first (ignore errors if already stopped)
+            try:
+                self.backend.stop_vm(vm_name, force=True)
+                time.sleep(3)
+            except Exception:
+                pass
+            # Start
+            self.backend.start_vm(vm_name)
             time.sleep(3)
-            self.backend.start_vm(vm["name"])
+            # Verify running
+            status = self.backend.get_status(vm_name)
+            self.assertEqual(status, "running")
+            # Stop again
+            self.backend.stop_vm(vm_name, force=True)
             time.sleep(3)
+            status = self.backend.get_status(vm_name)
+            self.assertEqual(status, "stopped")
         except Exception as e:
             self.skipTest(f"VirtualBox lifecycle test skipped: {e}")
 

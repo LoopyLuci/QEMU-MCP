@@ -17,9 +17,9 @@ from typing import Any
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from vm_mcp.config import VmMCPSettings, Secrets
-from vm_mcp.qmp_client import QMPClient
-from vm_mcp import qmp_client as qmp_mod
+from vm_harness.config import VmMCPSettings, Secrets
+from vm_harness.qmp_client import QMPClient
+from vm_harness import qmp_client as qmp_mod
 
 logger = logging.getLogger("vmharness.multi_qmp_bridge")
 

@@ -20,7 +20,7 @@ class TestVmMCPSettings:
 
     def test_default_settings(self):
         """Default settings should have sensible values."""
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         assert settings.server_name == "vm-mcp"
@@ -35,21 +35,21 @@ class TestVmMCPSettings:
 
     def test_qmp_uri_tcp(self, monkeypatch):
         """QMP URI should be tcp:host:port when no socket path."""
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         assert settings.qmp_uri() == "tcp:127.0.0.1:4444"
 
     def test_qmp_uri_unix(self, monkeypatch):
         """QMP URI should be unix:path when socket path is set."""
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings(qmp_socket_path="/tmp/qmp.sock")
         assert settings.qmp_uri() == "unix:/tmp/qmp.sock"
 
     def test_path_expansion(self, monkeypatch):
         """Paths with ~ and $vars should be expanded."""
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         monkeypatch.setenv("TEST_DISK", "/custom/path/disk.qcow2")
         settings = VmMCPSettings(vm_disk_path="$TEST_DISK")
@@ -61,7 +61,7 @@ class TestSecrets:
 
     def test_empty_secrets(self):
         """Empty secrets should mask to empty."""
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
 
         s = Secrets()
         assert s.mask() == "Secrets()"
@@ -70,7 +70,7 @@ class TestSecrets:
 
     def test_from_env(self, monkeypatch):
         """Secrets should load from environment variables."""
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
 
         monkeypatch.setenv("SSH_PASSWORD", "testpass")
         monkeypatch.setenv("AUTH_API_KEY", "testkey")
@@ -84,7 +84,7 @@ class TestSecrets:
 
     def test_from_dotenv(self, tmp_path):
         """Secrets should load from a .env file."""
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
 
         env_file = tmp_path / ".env"
         env_file.write_text(
@@ -97,7 +97,7 @@ class TestSecrets:
 
     def test_mask_does_not_expose_secrets(self, monkeypatch):
         """Masked secrets must never contain raw values."""
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
 
         monkeypatch.setenv("SSH_PASSWORD", "SuperSecret123!")
         monkeypatch.setenv("AUTH_API_KEY", "sk-test-abc123")
@@ -115,8 +115,8 @@ class TestToolSchemas:
 
     def test_vm_status_schema(self):
         """vm_status tool should be a Tool instance with correct metadata."""
-        from vm_mcp.tools.vm_lifecycle import vm_status_fn
-        from vm_mcp.tools.base import Tool
+        from vm_harness.tools.vm_lifecycle import vm_status_fn
+        from vm_harness.tools.base import Tool
 
         # vm_status_fn is wrapped by @tool() — it's a Tool instance
         assert isinstance(vm_status_fn, Tool)
@@ -156,8 +156,8 @@ class TestSSHClientUnit:
 
     def test_build_qemu_args_count(self):
         """build_qemu_args should produce a non-empty list."""
-        from vm_mcp.setup import build_qemu_args
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.setup import build_qemu_args
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         args = build_qemu_args(settings)
@@ -166,8 +166,8 @@ class TestSSHClientUnit:
 
     def test_build_qemu_args_with_iso(self):
         """build_qemu_args with start_iso=True should include CDROM args."""
-        from vm_mcp.setup import build_qemu_args
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.setup import build_qemu_args
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         settings.vm_iso_path = r"C:\test\omarchy.iso"
@@ -178,7 +178,7 @@ class TestSSHClientUnit:
 
     def test_qmp_client_initialization(self):
         """QMPClient should store URI and connection state."""
-        from vm_mcp.qmp_client import QMPClient
+        from vm_harness.qmp_client import QMPClient
 
         client = QMPClient("tcp:127.0.0.1:4444")
         assert client.uri == "tcp:127.0.0.1:4444"
@@ -186,7 +186,7 @@ class TestSSHClientUnit:
 
     def test_qmp_client_unix_uri(self):
         """QMPClient should accept unix: URIs."""
-        from vm_mcp.qmp_client import QMPClient
+        from vm_harness.qmp_client import QMPClient
 
         client = QMPClient("unix:/tmp/qmp.sock")
         assert client.uri == "unix:/tmp/qmp.sock"
@@ -199,19 +199,19 @@ class TestSkills:
 
     def test_skill_count(self):
         """Should have at least 3 skills defined."""
-        from vm_mcp.skills import SKILLS
+        from vm_harness.skills import SKILLS
         assert len(SKILLS) >= 3
 
     def test_skill_names(self):
         """Skill names should be unique and non-empty."""
-        from vm_mcp.skills import SKILLS
+        from vm_harness.skills import SKILLS
         names = [s.name for s in SKILLS]
         assert len(names) == len(set(names))  # No duplicates
         assert all(name for name in names)
 
     def test_get_skill(self):
         """get_skill should return the correct skill."""
-        from vm_mcp.skills import get_skill
+        from vm_harness.skills import get_skill
 
         skill = get_skill("vm_lifecycle")
         assert skill is not None
@@ -220,11 +220,11 @@ class TestSkills:
 
     def test_get_unknown_skill(self):
         """get_skill should return None for unknown names."""
-        from vm_mcp.skills import get_skill
+        from vm_harness.skills import get_skill
         assert get_skill("nonexistent_skill") is None
 
     def test_list_skills(self):
         """list_skills should return all skills."""
-        from vm_mcp.skills import list_skills
+        from vm_harness.skills import list_skills
         skills = list_skills()
         assert len(skills) >= 3

@@ -11,7 +11,7 @@ from typing import Any
 from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 from pydantic import Field
 
-from vm_mcp.tools.base import Extension, Tool, tool
+from vm_harness.tools.base import Extension, Tool, tool
 
 
 # ── VM Status ──────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ from vm_mcp.tools.base import Extension, Tool, tool
 )
 async def vm_status_fn(params: CallToolRequestParams) -> CallToolResult:
     """Query VM status via QMP."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     try:
         qmp = get_qmp_client()
@@ -85,7 +85,7 @@ async def vm_status_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_start_fn(params: CallToolRequestParams) -> CallToolResult:
     """Start or verify the VM."""
-    from vm_mcp.setup import start_vm
+    from vm_harness.setup import start_vm
 
     boot_iso = params.arguments.get("boot_iso", False) if params.arguments else False
     try:
@@ -117,7 +117,7 @@ async def vm_start_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_stop_fn(params: CallToolRequestParams) -> CallToolResult:
     """Gracefully stop the VM."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     try:
         qmp = get_qmp_client()
@@ -159,7 +159,7 @@ async def vm_stop_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_reset_fn(params: CallToolRequestParams) -> CallToolResult:
     """Hard reset the VM."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     try:
         qmp = get_qmp_client()
@@ -200,7 +200,7 @@ async def vm_reset_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_suspend_fn(params: CallToolRequestParams) -> CallToolResult:
     """Suspend the VM."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     try:
         qmp = get_qmp_client()
@@ -234,7 +234,7 @@ async def vm_suspend_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_resume_fn(params: CallToolRequestParams) -> CallToolResult:
     """Resume the VM."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     try:
         qmp = get_qmp_client()
@@ -271,7 +271,7 @@ async def vm_resume_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_eject_cdrom_fn(params: CallToolRequestParams) -> CallToolResult:
     """Eject the CDROM."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     try:
         qmp = get_qmp_client()
@@ -317,7 +317,7 @@ async def vm_eject_cdrom_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def vm_boot_device_fn(params: CallToolRequestParams) -> CallToolResult:
     """Query or set boot order."""
-    from vm_mcp.qmp_client import get_qmp_client
+    from vm_harness.qmp_client import get_qmp_client
 
     boot_order = params.arguments.get("boot_order") if params.arguments else None
 

@@ -23,9 +23,9 @@ from mcp.server.mcpserver.server import MCPServer
 
 Server = MCPServer  # backward compat alias
 
-from vm_mcp.config import VmMCPSettings, Secrets
-from vm_mcp.tools import vm_lifecycle, guest_ops
-from vm_mcp.tools.base import Tool
+from vm_harness.config import VmMCPSettings, Secrets
+from vm_harness.tools import vm_lifecycle, guest_ops
+from vm_harness.tools.base import Tool
 
 
 # ── Logging setup ──────────────────────────────────────────────────────────────

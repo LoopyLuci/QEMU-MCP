@@ -211,6 +211,8 @@ class QEMUBackend(HypervisorBackend):
             disk_path = config.disk_path
         else:
             disk_path = str(vm_dir / f"{config.name}.{config.disk_format}")
+            if config.disk_size_gb > 0 and not os.path.isfile(disk_path):
+                await self._create_disk(disk_path, config.disk_size_gb, config.disk_format)
 
         # Allocate ports
         qmp_port = config.management_port or _find_free_port(self._next_qmp_port)
@@ -300,6 +302,14 @@ class QEMUBackend(HypervisorBackend):
             raise VMAlreadyRunningError(f"VM '{name}' is already running")
 
         config = await self._load_vm_config(name)
+
+        # Auto-create disk if missing
+        disk_path = config.get("disk_path", "")
+        disk_size_gb = config.get("disk_size_gb", 0)
+        disk_format = config.get("disk_format", "qcow2")
+        if disk_path and disk_size_gb > 0 and not os.path.isfile(disk_path):
+            await self._create_disk(disk_path, disk_size_gb, disk_format)
+
         args = self._build_qemu_args(config, headless)
 
         try:
@@ -892,13 +902,15 @@ class QEMUBackend(HypervisorBackend):
 
         args = [
             self._qemu_binary,
-            "-machine", config.get("machine_type", "q35"),
-            "-smp", vcpus,
-            "-m", ram_mb,
-            "-cpu", config.get("cpu_model", "host" if os.name == "nt" else "qemu64"),
-            "-name", name,
-            "-qmp", f"tcp:127.0.0.1:{qmp_port},server,nowait",
         ]
+        machine_type = config.get("machine_type", "q35") or "q35"
+        args.extend(["-machine", machine_type])
+        args.extend(["-smp", vcpus])
+        args.extend(["-m", ram_mb])
+        cpu_model = config.get("cpu_model", "") or ("host" if os.name == "nt" else "qemu64")
+        args.extend(["-cpu", cpu_model])
+        args.extend(["-name", name])
+        args.extend(["-qmp", f"tcp:127.0.0.1:{qmp_port},server,nowait"])
 
         # Acceleration
         if config.get("enable_kvm", True):
@@ -975,8 +987,10 @@ class QEMUBackend(HypervisorBackend):
 
         # Guest agent
         if os.name == "nt":
+            # Use a TCP socket for the guest agent on Windows (named pipes can fail to bind)
+            ga_port = _find_free_port(4500)
             args.extend([
-                "-chardev", f"socket,path=//./pipe/qga-{name},server=on,wait=off,id=ga0",
+                "-chardev", f"socket,host=127.0.0.1,port={ga_port},server=on,wait=off,id=ga0",
                 "-device", "virtio-serial-pci",
                 "-device", "virtserialport,chardev=ga0,name=org.qemu.guest_agent.0",
             ])
@@ -1021,7 +1035,7 @@ class QEMUBackend(HypervisorBackend):
 
         # Import QMP client from existing codebase
         try:
-            from vm_mcp.qmp_client import QMPClient
+            from vm_harness.qmp_client import QMPClient
         except ImportError:
             # Fallback: define a minimal QMP client inline
             QMPClient = _MinimalQMPClient
@@ -1084,7 +1098,21 @@ class _MinimalQMPClient:
             port = int(rest[last_colon + 1:])
             self._reader, self._writer = await asyncio.open_connection(host, port)
         self._connected = True
+        await self._read_greeting()
         await self.send("qmp_capabilities")
+
+    async def _read_greeting(self) -> dict[str, Any]:
+        assert self._reader is not None
+        data = await asyncio.wait_for(
+            self._reader.readuntil(b"\n"),
+            timeout=self._timeout,
+        )
+        if not data:
+            raise RuntimeError("QMP connection closed while reading greeting")
+        greeting = json.loads(data.decode())
+        if "QMP" not in greeting:
+            raise RuntimeError(f"Invalid QMP greeting: {greeting}")
+        return greeting
 
     async def send(self, cmd: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
         if not self._connected:

@@ -27,6 +27,6 @@ if not env_path.is_file():
 from dotenv import load_dotenv
 load_dotenv(str(env_path))
 
-from vm_mcp.__main__ import main
+from vm_harness.__main__ import main
 
 asyncio.run(main())

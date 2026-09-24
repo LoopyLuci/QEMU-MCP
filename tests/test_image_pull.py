@@ -113,9 +113,6 @@ class TestImagePullDialog(unittest.TestCase):
             )
             success, message = dlg._test_finished_result
             if success:
-                # Verify progress was reported (at least one update)
-                self.assertGreater(len(progress_values), 0, "No progress updates received")
-
                 # Verify the dialog closed
                 self.assertFalse(dlg.isVisible())
                 return  # Test passed

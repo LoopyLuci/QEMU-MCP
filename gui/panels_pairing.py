@@ -318,13 +318,13 @@ class PairingPanel(QWidget):
     def _generate_pairing(self):
         """Generate a new pairing token and display QR code."""
         try:
-            from vm_mcp.api_server import QMCMApiServer
+            from vm_harness.api_server import QMCMApiServer
             import qrcode
 
             if self._server is None:
                 # Try to create a temporary server instance for token generation
                 try:
-                    from vm_mcp.api_server import _load_or_generate_signing_key
+                    from vm_harness.api_server import _load_or_generate_signing_key
                     key_dir = Path(".")
                     signing_key = _load_or_generate_signing_key(key_dir)
                     server = QMCMApiServer(

@@ -15,8 +15,8 @@ logger = logging.getLogger("qemu-mcp.api")
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-from vm_mcp.config import VmMCPSettings, Secrets
-from vm_mcp.setup import QMPClient
+from vm_harness.config import VmMCPSettings, Secrets
+from vm_harness.setup import QMPClient
 
 
 class QMCPAPIHandler(BaseHTTPRequestHandler):

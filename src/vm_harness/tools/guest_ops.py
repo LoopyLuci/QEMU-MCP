@@ -12,7 +12,7 @@ from typing import Any
 from mcp.types import CallToolRequestParams, CallToolResult, TextContent
 from pydantic import Field
 
-from vm_mcp.tools.base import Extension, Tool, tool
+from vm_harness.tools.base import Extension, Tool, tool
 
 
 # ── Command Execution ──────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ from vm_mcp.tools.base import Extension, Tool, tool
 )
 async def guest_exec_fn(params: CallToolRequestParams) -> CallToolResult:
     """Execute a command in the guest via SSH."""
-    from vm_mcp.ssh_client import run_guest_command
+    from vm_harness.ssh_client import run_guest_command
 
     command = params.arguments.get("command", "")
     timeout = params.arguments.get("timeout_seconds", 30) if params.arguments else 30
@@ -112,7 +112,7 @@ async def guest_exec_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def guest_file_read_fn(params: CallToolRequestParams) -> CallToolResult:
     """Read a file from the guest."""
-    from vm_mcp.ssh_client import read_guest_file
+    from vm_harness.ssh_client import read_guest_file
 
     path = params.arguments.get("path", "")
     max_bytes = params.arguments.get("max_bytes", 1048576) if params.arguments else 1048576
@@ -176,7 +176,7 @@ async def guest_file_read_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def guest_file_write_fn(params: CallToolRequestParams) -> CallToolResult:
     """Write a file to the guest."""
-    from vm_mcp.ssh_client import write_guest_file
+    from vm_harness.ssh_client import write_guest_file
 
     path = params.arguments.get("path", "")
     content = params.arguments.get("content", "")
@@ -241,7 +241,7 @@ async def guest_file_write_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def guest_file_list_fn(params: CallToolRequestParams) -> CallToolResult:
     """List a directory in the guest."""
-    from vm_mcp.ssh_client import list_guest_directory
+    from vm_harness.ssh_client import list_guest_directory
 
     path = params.arguments.get("path", "")
     detail = params.arguments.get("detail", True) if params.arguments else True
@@ -317,7 +317,7 @@ async def guest_file_list_fn(params: CallToolRequestParams) -> CallToolResult:
 )
 async def guest_file_remove_fn(params: CallToolRequestParams) -> CallToolResult:
     """Remove a file or directory from the guest."""
-    from vm_mcp.ssh_client import remove_guest_path
+    from vm_harness.ssh_client import remove_guest_path
 
     path = params.arguments.get("path", "")
     recursive = params.arguments.get("recursive", False) if params.arguments else False

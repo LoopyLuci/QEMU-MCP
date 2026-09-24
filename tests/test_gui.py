@@ -342,7 +342,7 @@ class TestBridges:
 
     def test_qmp_bridge_constructs(self):
         from gui.qmp_bridge import QMPBridge
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         bridge = QMPBridge(settings=settings)
@@ -351,7 +351,7 @@ class TestBridges:
 
     def test_ssh_bridge_constructs(self):
         from gui.ssh_bridge import SSHBridge
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         bridge = SSHBridge(settings=settings)
@@ -490,7 +490,7 @@ class TestHardwareAcceleration:
 
     def test_config_acceleration_persistence(self, monkeypatch):
         """vm_acceleration setting persists through env var."""
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         # Set env var before creating settings
         monkeypatch.setenv("VM_ACCELERATION", "haxm")
@@ -499,7 +499,7 @@ class TestHardwareAcceleration:
 
     def test_config_acceleration_default(self):
         """Default acceleration mode is whpx."""
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         settings = VmMCPSettings()
         assert settings.vm_acceleration == "whpx"

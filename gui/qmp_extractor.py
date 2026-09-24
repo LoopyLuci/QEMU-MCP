@@ -20,7 +20,7 @@ class QMPExtractor:
 
     async def _send(self, cmd: str, args: dict | None = None) -> dict:
         """Send a QMP command and return the response."""
-        from vm_mcp.setup import QMPClient
+        from vm_harness.setup import QMPClient
         client = QMPClient(f"tcp:{self._host}:{self._port}")
         await client.connect()
         result = await client.send(cmd, args)

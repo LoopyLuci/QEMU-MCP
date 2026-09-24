@@ -16,7 +16,7 @@ import time
 from typing import Any
 from pathlib import Path
 
-from vm_mcp.config import VmMCPSettings, Secrets
+from vm_harness.config import VmMCPSettings, Secrets
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +237,7 @@ async def start_vm(boot_iso: bool = False) -> str:
     Returns:
         Status message
     """
-    from vm_mcp.config import VmMCPSettings, Secrets
+    from vm_harness.config import VmMCPSettings, Secrets
 
     settings = VmMCPSettings()
     secrets = Secrets.from_env()

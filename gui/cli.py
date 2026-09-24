@@ -27,7 +27,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "src"))
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from vm_mcp.config import VmMCPSettings, Secrets
+from vm_harness.config import VmMCPSettings, Secrets
 
 
 def cmd_status(args):

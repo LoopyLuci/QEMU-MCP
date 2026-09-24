@@ -10,8 +10,8 @@ from typing import Any
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from vm_mcp.config import VmMCPSettings, Secrets
-from vm_mcp import ssh_client as ssh_mod
+from vm_harness.config import VmMCPSettings, Secrets
+from vm_harness import ssh_client as ssh_mod
 
 logger = logging.getLogger("vmharness.ssh_bridge")
 

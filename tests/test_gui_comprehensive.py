@@ -87,7 +87,7 @@ def main_window(app, request):
 @pytest.fixture
 def qmp_client():
     """Create a QMP client connected to live QEMU."""
-    from vm_mcp.setup import QMPClient
+    from vm_harness.setup import QMPClient
     
     # Create new event loop for this test
     loop = asyncio.new_event_loop()

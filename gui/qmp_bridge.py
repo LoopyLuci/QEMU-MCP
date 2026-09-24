@@ -21,9 +21,9 @@ from typing import Any
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from vm_mcp.config import VmMCPSettings, Secrets
-from vm_mcp.qmp_client import QMPClient
-from vm_mcp import qmp_client as qmp_mod
+from vm_harness.config import VmMCPSettings, Secrets
+from vm_harness.qmp_client import QMPClient
+from vm_harness import qmp_client as qmp_mod
 
 logger = logging.getLogger("vmharness.qmp_bridge")
 
@@ -71,7 +71,7 @@ class QMPBridge(QObject):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self._settings = settings
-        from vm_mcp.config import Secrets
+        from vm_harness.config import Secrets
 
         self._secrets = Secrets.from_env()
         self._qmp_uri = self._build_uri()

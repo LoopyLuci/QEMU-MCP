@@ -41,9 +41,9 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from vm_mcp.config import VmMCPSettings, Secrets
-from vm_mcp.qmp_client import QMPClient
-from vm_mcp.setup import start_vm, stop_vm
+from vm_harness.config import VmMCPSettings, Secrets
+from vm_harness.qmp_client import QMPClient
+from vm_harness.setup import start_vm, stop_vm
 from gui.widgets import (
     StatusIndicator,
     IconButton,
@@ -468,7 +468,7 @@ class MainWindow(QMainWindow):
         """Initialize API server for pairing token generation."""
         try:
             from pathlib import Path
-            from vm_mcp.api_server import QMCMApiServer, _load_or_generate_signing_key
+            from vm_harness.api_server import QMCMApiServer, _load_or_generate_signing_key
 
             # Signing key is at PROJECT_ROOT/.vmharness_signing_key
             key_dir = Path(".")

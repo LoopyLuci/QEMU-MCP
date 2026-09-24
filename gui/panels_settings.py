@@ -669,7 +669,7 @@ class SettingsPanel(QWidget):
             return
 
         # Load into a fresh settings object to get processed values
-        from vm_mcp.config import VmMCPSettings
+        from vm_harness.config import VmMCPSettings
 
         # Temporarily point settings at this env file
         os.environ["VM_MCP_ENV_FILE"] = str(env_path.resolve())

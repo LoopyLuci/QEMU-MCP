@@ -180,7 +180,7 @@ class MCPTestExecutor:
                     "id": "QMP-001",
                     "name": "QMP connection",
                     "category": "connectivity",
-                    "command": f'{self._venv_py} -c "import sys, asyncio; sys.path.insert(0, 'src'); from vm_mcp.setup import QMPClient; async def t(): c = QMPClient('tcp:127.0.0.1:4444'); await c.connect(); print('PASS')"',
+                    "command": f'{self._venv_py} -c "import sys, asyncio; sys.path.insert(0, 'src'); from vm_harness.setup import QMPClient; async def t(): c = QMPClient('tcp:127.0.0.1:4444'); await c.connect(); print('PASS')"',
                     "expected": "PASS",
                 },
             ],

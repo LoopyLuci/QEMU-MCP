@@ -32,7 +32,7 @@ def _qmp_port_open() -> bool:
 
 @pytest.fixture(scope="module")
 def settings():
-    from vm_mcp.config import VmMCPSettings
+    from vm_harness.config import VmMCPSettings
 
     s = VmMCPSettings()
     return s
@@ -52,8 +52,8 @@ class TestQMPBridgeLive:
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
     def test_qmp_query_status(self, settings):
-        from vm_mcp.qmp_client import QMPClient
-        from vm_mcp import qmp_client as qmp_mod
+        from vm_harness.qmp_client import QMPClient
+        from vm_harness import qmp_client as qmp_mod
 
         async def _run():
             client = QMPClient(uri=settings.qmp_uri())
@@ -74,8 +74,8 @@ class TestQMPBridgeLive:
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
     def test_qmp_system_reset(self, settings):
-        from vm_mcp.qmp_client import QMPClient
-        from vm_mcp import qmp_client as qmp_mod
+        from vm_harness.qmp_client import QMPClient
+        from vm_harness import qmp_client as qmp_mod
 
         async def _run():
             client = QMPClient(uri=settings.qmp_uri())
@@ -91,8 +91,8 @@ class TestQMPBridgeLive:
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
     def test_qmp_stop_cont(self, settings):
-        from vm_mcp.qmp_client import QMPClient
-        from vm_mcp import qmp_client as qmp_mod
+        from vm_harness.qmp_client import QMPClient
+        from vm_harness import qmp_client as qmp_mod
 
         async def _run():
             client = QMPClient(uri=settings.qmp_uri())
@@ -109,8 +109,8 @@ class TestQMPBridgeLive:
         not _qmp_port_open(), reason="QMP port 4444 not open — QEMU not running"
     )
     def test_qmp_eject_device(self, settings):
-        from vm_mcp.qmp_client import QMPClient
-        from vm_mcp import qmp_client as qmp_mod
+        from vm_harness.qmp_client import QMPClient
+        from vm_harness import qmp_client as qmp_mod
 
         async def _run():
             client = QMPClient(uri=settings.qmp_uri())
